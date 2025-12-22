@@ -15,6 +15,7 @@ import { Route as RecoverPasswordRouteImport } from './routes/recover-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
+import { Route as LayoutWorkspaceRouteImport } from './routes/_layout/workspace'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutChatStreamRouteImport } from './routes/_layout/chat-stream'
@@ -49,6 +50,11 @@ const LayoutIndexRoute = LayoutIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutWorkspaceRoute = LayoutWorkspaceRouteImport.update({
+  id: '/workspace',
+  path: '/workspace',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/chat-stream': typeof LayoutChatStreamRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/workspace': typeof LayoutWorkspaceRoute
   '/': typeof LayoutIndexRoute
 }
 export interface FileRoutesByTo {
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/chat-stream': typeof LayoutChatStreamRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/workspace': typeof LayoutWorkspaceRoute
   '/': typeof LayoutIndexRoute
 }
 export interface FileRoutesById {
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_layout/chat-stream': typeof LayoutChatStreamRoute
   '/_layout/items': typeof LayoutItemsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
+  '/_layout/workspace': typeof LayoutWorkspaceRoute
   '/_layout/': typeof LayoutIndexRoute
 }
 export interface FileRouteTypes {
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/chat-stream'
     | '/items'
     | '/settings'
+    | '/workspace'
     | '/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/chat-stream'
     | '/items'
     | '/settings'
+    | '/workspace'
     | '/'
   id:
     | '__root__'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_layout/chat-stream'
     | '/_layout/items'
     | '/_layout/settings'
+    | '/_layout/workspace'
     | '/_layout/'
   fileRoutesById: FileRoutesById
 }
@@ -194,6 +206,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/workspace': {
+      id: '/_layout/workspace'
+      path: '/workspace'
+      fullPath: '/workspace'
+      preLoaderRoute: typeof LayoutWorkspaceRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/settings': {
       id: '/_layout/settings'
       path: '/settings'
@@ -230,6 +249,7 @@ interface LayoutRouteChildren {
   LayoutChatStreamRoute: typeof LayoutChatStreamRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
+  LayoutWorkspaceRoute: typeof LayoutWorkspaceRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
 
@@ -238,6 +258,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutChatStreamRoute: LayoutChatStreamRoute,
   LayoutItemsRoute: LayoutItemsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
+  LayoutWorkspaceRoute: LayoutWorkspaceRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }
 
