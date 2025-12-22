@@ -1,15 +1,43 @@
 # backend/app/api/routes/chat.py
 import os
+from datetime import datetime
 from typing import AsyncIterator
-import httpx
 
-from fastapi import APIRouter, Query, Depends
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlmodel import func, select
 from starlette.responses import StreamingResponse
 
-from app.api.deps import get_current_user, CurrentUser
+from app.api.deps import CurrentUser, SessionDep, get_current_user
+from app.core.ids import generate_ulid
+from app.models import ConversationThread, ConversationThreadPublic, ConversationThreadsPublic
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(tags=["chat"])
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:9001")
+
+STATUS_ACTIVE = "active"
+STATUS_ARCHIVED = "archived"
+STATUS_DELETED = "deleted"
+
+
+def _get_thread(
+    session: SessionDep,
+    current_user: CurrentUser,
+    thread_id: str,
+    *,
+    include_deleted: bool = False,
+) -> ConversationThread:
+    statement = select(ConversationThread).where(
+        ConversationThread.thread_id == thread_id,
+        ConversationThread.user_id == current_user.id,
+    )
+    if not include_deleted:
+        statement = statement.where(ConversationThread.status != STATUS_DELETED)
+    thread = session.exec(statement).one_or_none()
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    return thread
+
 
 # TODO: 把sse迁移到agent服务中
 # def sse(event: str, data: dict, event_id: int | None = None) -> str:
@@ -21,7 +49,7 @@ AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:9001")
 #     msg += f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 #     return msg
 
-@router.get("/stream", dependencies=[Depends(get_current_user)])
+@router.get("/chat/stream", dependencies=[Depends(get_current_user)])
 async def chat_stream(
     _current_user: CurrentUser,
     q: str = Query(default="hello"),
@@ -30,7 +58,7 @@ async def chat_stream(
         # payload 的字段要和 agent 服务的 /agent/chat 接口保持一致
         payload = {
             "message": q,
-            # 后续你可以在这里加入 user_id / session_id
+            # 后续你可以在这里加入 user_id / thread_id 等字段
         }
 
         async with httpx.AsyncClient(timeout=None) as client:
@@ -53,3 +81,104 @@ async def chat_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/threads", response_model=ConversationThreadPublic)
+def create_thread(session: SessionDep, current_user: CurrentUser) -> ConversationThread:
+    thread = ConversationThread(
+        thread_id=generate_ulid(),
+        user_id=current_user.id,
+        status=STATUS_ACTIVE,
+    )
+    session.add(thread)
+    session.commit()
+    session.refresh(thread)
+    return thread
+
+
+@router.get("/threads", response_model=ConversationThreadsPublic)
+def list_threads(
+    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
+) -> ConversationThreadsPublic:
+    count_statement = (
+        select(func.count())
+        .select_from(ConversationThread)
+        .where(
+            ConversationThread.user_id == current_user.id,
+            ConversationThread.status != STATUS_DELETED,
+        )
+    )
+    count = session.exec(count_statement).one()
+    statement = (
+        select(ConversationThread)
+        .where(
+            ConversationThread.user_id == current_user.id,
+            ConversationThread.status != STATUS_DELETED,
+        )
+        .offset(skip)
+        .limit(limit)
+        .order_by(ConversationThread.updated_at.desc())
+    )
+    threads = session.exec(statement).all()
+    return ConversationThreadsPublic(data=threads, count=count)
+
+
+@router.get("/threads/{thread_id}", response_model=ConversationThreadPublic)
+def get_thread(
+    session: SessionDep, current_user: CurrentUser, thread_id: str
+) -> ConversationThread:
+    return _get_thread(session, current_user, thread_id)
+
+
+@router.post("/threads/{thread_id}/archive", response_model=ConversationThreadPublic)
+def archive_thread(
+    session: SessionDep, current_user: CurrentUser, thread_id: str
+) -> ConversationThread:
+    thread = _get_thread(session, current_user, thread_id, include_deleted=True)
+    if thread.status != STATUS_ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Thread is not active",
+        )
+    thread.status = STATUS_ARCHIVED
+    thread.updated_at = datetime.now()
+    session.add(thread)
+    session.commit()
+    session.refresh(thread)
+    return thread
+
+
+@router.post("/threads/{thread_id}/restore", response_model=ConversationThreadPublic)
+def restore_thread(
+    session: SessionDep, current_user: CurrentUser, thread_id: str
+) -> ConversationThread:
+    thread = _get_thread(session, current_user, thread_id, include_deleted=True)
+    if thread.status != STATUS_ARCHIVED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Thread is not archived",
+        )
+    thread.status = STATUS_ACTIVE
+    thread.updated_at = datetime.now()
+    session.add(thread)
+    session.commit()
+    session.refresh(thread)
+    return thread
+
+
+@router.delete("/threads/{thread_id}", response_model=ConversationThreadPublic)
+def delete_thread(
+    session: SessionDep, current_user: CurrentUser, thread_id: str
+) -> ConversationThread:
+    thread = _get_thread(session, current_user, thread_id, include_deleted=True)
+    if thread.status != STATUS_ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Thread is not active",
+        )
+    thread.status = STATUS_DELETED
+    thread.updated_at = datetime.now()
+    session.add(thread)
+    session.commit()
+    session.refresh(thread)
+    return thread

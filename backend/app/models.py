@@ -1,6 +1,9 @@
 import uuid
+from datetime import datetime
+from typing import Any
 
-from pydantic import EmailStr
+import sqlalchemy as sa
+from pydantic import ConfigDict, EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -44,6 +47,9 @@ class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
+    conversation_threads: list["ConversationThread"] = Relationship(
+        back_populates="user", cascade_delete=True
+    )
 
 
 # Properties to return via API, id is always required
@@ -89,6 +95,44 @@ class ItemPublic(ItemBase):
 
 class ItemsPublic(SQLModel):
     data: list[ItemPublic]
+    count: int
+
+
+# Shared properties
+class ConversationThreadBase(SQLModel):
+    status: str = Field(default="active", max_length=32)
+    metadata_: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=sa.Column("metadata", sa.JSON),
+        alias="metadata",
+    )
+
+    model_config = SQLModel.model_config | ConfigDict(populate_by_name=True)
+
+
+# Database model, database table inferred from class name
+class ConversationThread(ConversationThreadBase, table=True):
+    __tablename__ = "conversation_thread"
+
+    thread_id: str = Field(primary_key=True, max_length=26)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    user: User | None = Relationship(back_populates="conversation_threads")
+
+
+# Properties to return via API, thread_id is always required
+class ConversationThreadPublic(ConversationThreadBase):
+    thread_id: str
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationThreadsPublic(SQLModel):
+    data: list[ConversationThreadPublic]
     count: int
 
 
