@@ -11,12 +11,6 @@ export function WorkspacePage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Workspace</h1>
-          <p className="text-muted-foreground">
-            Base layout for scientific agent workspaces.
-          </p>
-        </div>
         <Button
           variant="outline"
           size="sm"

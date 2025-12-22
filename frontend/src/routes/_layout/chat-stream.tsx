@@ -177,13 +177,6 @@ function ChatStream() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Chat Stream</h1>
-        <p className="text-muted-foreground">
-          Fetch the `/chat/stream` SSE endpoint and append tokens as they arrive.
-        </p>
-      </div>
-
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <Input
           value={query}
