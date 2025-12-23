@@ -123,21 +123,26 @@
   }
 }
 
-.chat-input-textarea {
+* {
   scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) transparent;
+  scrollbar-color: color-mix(
+      in oklch,
+      var(--muted-foreground) 60%,
+      transparent
+    )
+    transparent;
 }
 
-.chat-input-textarea::-webkit-scrollbar {
+*::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
-.chat-input-textarea::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.chat-input-textarea::-webkit-scrollbar-thumb {
-  background-color: var(--muted-foreground);
+*::-webkit-scrollbar-thumb {
   background-color: color-mix(
     in oklch,
     var(--muted-foreground) 60%,
@@ -146,12 +151,12 @@
   border-radius: 999px;
 }
 
-.chat-input-textarea::-webkit-scrollbar-button {
+*::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
 }
 
-.chat-input-textarea::-webkit-scrollbar-corner {
+*::-webkit-scrollbar-corner {
   background: transparent;
 }
