@@ -4,7 +4,6 @@ import {
   Briefcase,
   Home,
   LayoutGrid,
-  MessageSquare,
   Plus,
   Users,
 } from "lucide-react"
@@ -63,13 +62,14 @@ export function AppSidebar() {
     .filter((thread) => thread.thread_id && thread.user_id)
     .map((thread) => ({
       title: getThreadTitle(thread.title),
+      threadTitle: thread.title,
       path: `/workspace/${thread.thread_id}`,
+      threadId: thread.thread_id,
     }))
 
   const baseItems: Item[] = [
     { icon: Home, title: "Dashboard", path: "/" },
     { icon: Briefcase, title: "Items", path: "/items" },
-    { icon: MessageSquare, title: "Chat Stream", path: "/chat-stream" },
     {
       icon: LayoutGrid,
       title: "Workspace",

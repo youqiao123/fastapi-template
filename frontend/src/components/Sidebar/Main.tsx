@@ -1,6 +1,5 @@
 import { Link as RouterLink, useRouterState } from "@tanstack/react-router"
 import type { LucideIcon } from "lucide-react"
-
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -13,11 +12,14 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { ThreadActionsMenu } from "@/components/Sidebar/ThreadActionsMenu"
 import { cn } from "@/lib/utils"
 
 export type SubItem = {
   title: string
   path: string
+  threadId?: string
+  threadTitle?: string | null
 }
 
 export type ItemAction = {
@@ -102,12 +104,14 @@ export function Main({ items }: MainProps) {
                       <SidebarMenuSub>
                         {item.children.map((child) => {
                           const isChildActive = currentPath === child.path
+                          const hasThreadActions = Boolean(child.threadId)
 
                           return (
                             <SidebarMenuSubItem key={child.path}>
                               <SidebarMenuSubButton
                                 asChild
                                 isActive={isChildActive}
+                                className={cn(hasThreadActions && "pr-8")}
                               >
                                 <RouterLink
                                   to={child.path}
@@ -117,6 +121,14 @@ export function Main({ items }: MainProps) {
                                   <span>{child.title}</span>
                                 </RouterLink>
                               </SidebarMenuSubButton>
+                              {hasThreadActions ? (
+                                <ThreadActionsMenu
+                                  threadId={child.threadId ?? ""}
+                                  title={child.title}
+                                  threadTitle={child.threadTitle}
+                                  isParentActive={isActive}
+                                />
+                              ) : null}
                             </SidebarMenuSubItem>
                           )
                         })}

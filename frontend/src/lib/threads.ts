@@ -35,3 +35,30 @@ export const createThread = () =>
     method: "POST",
     url: "/api/v1/threads",
   })
+
+export type ConversationThreadUpdate = {
+  title?: string | null
+}
+
+export const updateThread = (
+  threadId: string,
+  data: ConversationThreadUpdate,
+) =>
+  request<ConversationThread>(OpenAPI, {
+    method: "PATCH",
+    url: `/api/v1/threads/${threadId}`,
+    body: data,
+    mediaType: "application/json",
+  })
+
+export const archiveThread = (threadId: string) =>
+  request<ConversationThread>(OpenAPI, {
+    method: "POST",
+    url: `/api/v1/threads/${threadId}/archive`,
+  })
+
+export const deleteThread = (threadId: string) =>
+  request<ConversationThread>(OpenAPI, {
+    method: "DELETE",
+    url: `/api/v1/threads/${threadId}`,
+  })

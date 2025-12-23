@@ -18,7 +18,6 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutWorkspaceRouteImport } from './routes/_layout/workspace'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
-import { Route as LayoutChatStreamRouteImport } from './routes/_layout/chat-stream'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutWorkspaceThreadIdRouteImport } from './routes/_layout/workspace.$threadId'
 
@@ -66,11 +65,6 @@ const LayoutItemsRoute = LayoutItemsRouteImport.update({
   path: '/items',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutChatStreamRoute = LayoutChatStreamRouteImport.update({
-  id: '/chat-stream',
-  path: '/chat-stream',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutAdminRoute = LayoutAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -88,7 +82,6 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRoute
-  '/chat-stream': typeof LayoutChatStreamRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
   '/workspace': typeof LayoutWorkspaceRouteWithChildren
@@ -101,7 +94,6 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRoute
-  '/chat-stream': typeof LayoutChatStreamRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
   '/workspace': typeof LayoutWorkspaceRouteWithChildren
@@ -116,7 +108,6 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_layout/admin': typeof LayoutAdminRoute
-  '/_layout/chat-stream': typeof LayoutChatStreamRoute
   '/_layout/items': typeof LayoutItemsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/workspace': typeof LayoutWorkspaceRouteWithChildren
@@ -131,7 +122,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin'
-    | '/chat-stream'
     | '/items'
     | '/settings'
     | '/workspace'
@@ -144,7 +134,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin'
-    | '/chat-stream'
     | '/items'
     | '/settings'
     | '/workspace'
@@ -158,7 +147,6 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/_layout/admin'
-    | '/_layout/chat-stream'
     | '/_layout/items'
     | '/_layout/settings'
     | '/_layout/workspace'
@@ -239,13 +227,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutItemsRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/chat-stream': {
-      id: '/_layout/chat-stream'
-      path: '/chat-stream'
-      fullPath: '/chat-stream'
-      preLoaderRoute: typeof LayoutChatStreamRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/admin': {
       id: '/_layout/admin'
       path: '/admin'
@@ -277,7 +258,6 @@ const LayoutWorkspaceRouteWithChildren = LayoutWorkspaceRoute._addFileChildren(
 
 interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
-  LayoutChatStreamRoute: typeof LayoutChatStreamRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutWorkspaceRoute: typeof LayoutWorkspaceRouteWithChildren
@@ -286,7 +266,6 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
-  LayoutChatStreamRoute: LayoutChatStreamRoute,
   LayoutItemsRoute: LayoutItemsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutWorkspaceRoute: LayoutWorkspaceRouteWithChildren,

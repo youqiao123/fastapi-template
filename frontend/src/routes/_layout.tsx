@@ -25,6 +25,9 @@ export const Route = createFileRoute("/_layout")({
 })
 
 function Layout() {
+  const locationPathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const pageTitle = useRouterState({
     select: (state) => {
       const matches = [...state.matches].reverse()
@@ -51,6 +54,7 @@ function Layout() {
       return ""
     },
   })
+  const isWorkspaceRoute = locationPathname.startsWith("/workspace")
 
   return (
     <SidebarProvider>
@@ -63,7 +67,11 @@ function Layout() {
           </h1>
         </header>
         <main className="flex-1 p-6 md:p-8">
-          <div className="mx-auto max-w-7xl">
+          <div
+            className={
+              isWorkspaceRoute ? "h-full w-full max-w-none" : "mx-auto max-w-7xl"
+            }
+          >
             <Outlet />
           </div>
         </main>

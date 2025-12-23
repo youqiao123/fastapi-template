@@ -10,7 +10,12 @@ from starlette.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, SessionDep, get_current_user
 from app.core.ids import generate_ulid
-from app.models import ConversationThread, ConversationThreadPublic, ConversationThreadsPublic
+from app.models import (
+    ConversationThread,
+    ConversationThreadPublic,
+    ConversationThreadsPublic,
+    ConversationThreadUpdate,
+)
 
 router = APIRouter(tags=["chat"])
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:9001")
@@ -51,14 +56,19 @@ def _get_thread(
 
 @router.get("/chat/stream", dependencies=[Depends(get_current_user)])
 async def chat_stream(
-    _current_user: CurrentUser,
+    session: SessionDep,
+    current_user: CurrentUser,
     q: str = Query(default="hello"),
+    thread_id: str = Query(..., min_length=1),
 ):
+    _get_thread(session, current_user, thread_id)
+
     async def gen() -> AsyncIterator[bytes]:
         # payload 的字段要和 agent 服务的 /agent/chat 接口保持一致
         payload = {
             "message": q,
-            # 后续你可以在这里加入 user_id / thread_id 等字段
+            "user_id": str(current_user.id),
+            "thread_id": thread_id,
         }
 
         async with httpx.AsyncClient(timeout=None) as client:
@@ -130,6 +140,24 @@ def get_thread(
     return _get_thread(session, current_user, thread_id)
 
 
+@router.patch("/threads/{thread_id}", response_model=ConversationThreadPublic)
+def update_thread(
+    session: SessionDep,
+    current_user: CurrentUser,
+    thread_id: str,
+    thread_in: ConversationThreadUpdate,
+) -> ConversationThread:
+    thread = _get_thread(session, current_user, thread_id)
+    update_data = thread_in.model_dump(exclude_unset=True)
+    if update_data:
+        thread.sqlmodel_update(update_data)
+        thread.updated_at = datetime.now()
+        session.add(thread)
+        session.commit()
+        session.refresh(thread)
+    return thread
+
+
 @router.post("/threads/{thread_id}/archive", response_model=ConversationThreadPublic)
 def archive_thread(
     session: SessionDep, current_user: CurrentUser, thread_id: str
@@ -171,10 +199,10 @@ def delete_thread(
     session: SessionDep, current_user: CurrentUser, thread_id: str
 ) -> ConversationThread:
     thread = _get_thread(session, current_user, thread_id, include_deleted=True)
-    if thread.status != STATUS_ACTIVE:
+    if thread.status == STATUS_DELETED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Thread is not active",
+            detail="Thread is already deleted",
         )
     thread.status = STATUS_DELETED
     thread.updated_at = datetime.now()

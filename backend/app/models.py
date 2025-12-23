@@ -111,6 +111,11 @@ class ConversationThreadBase(SQLModel):
     model_config = SQLModel.model_config | ConfigDict(populate_by_name=True)
 
 
+# Properties to receive on thread update
+class ConversationThreadUpdate(SQLModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+
+
 # Database model, database table inferred from class name
 class ConversationThread(ConversationThreadBase, table=True):
     __tablename__ = "conversation_thread"

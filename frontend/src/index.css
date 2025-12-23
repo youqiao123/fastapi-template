@@ -122,3 +122,36 @@
     cursor: pointer;
   }
 }
+
+.chat-input-textarea {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
+
+.chat-input-textarea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-input-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-input-textarea::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  background-color: color-mix(
+    in oklch,
+    var(--muted-foreground) 60%,
+    transparent
+  );
+  border-radius: 999px;
+}
+
+.chat-input-textarea::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.chat-input-textarea::-webkit-scrollbar-corner {
+  background: transparent;
+}

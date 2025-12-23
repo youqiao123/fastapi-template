@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { WorkspacePage } from "@/components/Workspace/WorkspacePage"
 
 export const Route = createFileRoute("/_layout/workspace")({
-  component: WorkspacePage,
+  component: WorkspaceRoute,
   head: () => ({
     meta: [
       {
@@ -12,3 +12,7 @@ export const Route = createFileRoute("/_layout/workspace")({
     ],
   }),
 })
+
+function WorkspaceRoute() {
+  return <WorkspacePage />
+}
