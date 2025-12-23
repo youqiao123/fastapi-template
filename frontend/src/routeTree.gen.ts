@@ -20,6 +20,7 @@ import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutChatStreamRouteImport } from './routes/_layout/chat-stream'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
+import { Route as LayoutWorkspaceThreadIdRouteImport } from './routes/_layout/workspace.$threadId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -75,6 +76,11 @@ const LayoutAdminRoute = LayoutAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutWorkspaceThreadIdRoute = LayoutWorkspaceThreadIdRouteImport.update({
+  id: '/$threadId',
+  path: '/$threadId',
+  getParentRoute: () => LayoutWorkspaceRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
@@ -85,8 +91,9 @@ export interface FileRoutesByFullPath {
   '/chat-stream': typeof LayoutChatStreamRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
-  '/workspace': typeof LayoutWorkspaceRoute
+  '/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/': typeof LayoutIndexRoute
+  '/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -97,8 +104,9 @@ export interface FileRoutesByTo {
   '/chat-stream': typeof LayoutChatStreamRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
-  '/workspace': typeof LayoutWorkspaceRoute
+  '/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/': typeof LayoutIndexRoute
+  '/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -111,8 +119,9 @@ export interface FileRoutesById {
   '/_layout/chat-stream': typeof LayoutChatStreamRoute
   '/_layout/items': typeof LayoutItemsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
-  '/_layout/workspace': typeof LayoutWorkspaceRoute
+  '/_layout/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/_layout/': typeof LayoutIndexRoute
+  '/_layout/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/workspace'
     | '/'
+    | '/workspace/$threadId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/workspace'
     | '/'
+    | '/workspace/$threadId'
   id:
     | '__root__'
     | '/_layout'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/_layout/settings'
     | '/_layout/workspace'
     | '/_layout/'
+    | '/_layout/workspace/$threadId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -241,15 +253,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/workspace/$threadId': {
+      id: '/_layout/workspace/$threadId'
+      path: '/$threadId'
+      fullPath: '/workspace/$threadId'
+      preLoaderRoute: typeof LayoutWorkspaceThreadIdRouteImport
+      parentRoute: typeof LayoutWorkspaceRoute
+    }
   }
 }
+
+interface LayoutWorkspaceRouteChildren {
+  LayoutWorkspaceThreadIdRoute: typeof LayoutWorkspaceThreadIdRoute
+}
+
+const LayoutWorkspaceRouteChildren: LayoutWorkspaceRouteChildren = {
+  LayoutWorkspaceThreadIdRoute: LayoutWorkspaceThreadIdRoute,
+}
+
+const LayoutWorkspaceRouteWithChildren = LayoutWorkspaceRoute._addFileChildren(
+  LayoutWorkspaceRouteChildren,
+)
 
 interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutChatStreamRoute: typeof LayoutChatStreamRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
-  LayoutWorkspaceRoute: typeof LayoutWorkspaceRoute
+  LayoutWorkspaceRoute: typeof LayoutWorkspaceRouteWithChildren
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
 
@@ -258,7 +289,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutChatStreamRoute: LayoutChatStreamRoute,
   LayoutItemsRoute: LayoutItemsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
-  LayoutWorkspaceRoute: LayoutWorkspaceRoute,
+  LayoutWorkspaceRoute: LayoutWorkspaceRouteWithChildren,
   LayoutIndexRoute: LayoutIndexRoute,
 }
 

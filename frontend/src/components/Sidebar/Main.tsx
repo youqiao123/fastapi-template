@@ -5,6 +5,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -19,11 +20,19 @@ export type SubItem = {
   path: string
 }
 
+export type ItemAction = {
+  icon: LucideIcon
+  label: string
+  onClick: () => void
+  disabled?: boolean
+}
+
 export type Item = {
   icon: LucideIcon
   title: string
   path: string
   children?: SubItem[]
+  action?: ItemAction
 }
 
 interface MainProps {
@@ -64,6 +73,21 @@ export function Main({ items }: MainProps) {
                     <span>{item.title}</span>
                   </RouterLink>
                 </SidebarMenuButton>
+                {item.action ? (
+                  <SidebarMenuAction
+                    type="button"
+                    aria-label={item.action.label}
+                    title={item.action.label}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      item.action?.onClick()
+                    }}
+                    disabled={item.action.disabled}
+                  >
+                    <item.action.icon />
+                  </SidebarMenuAction>
+                ) : null}
                 {shouldShowChildren ? (
                   <div
                     aria-hidden={!isActive}
@@ -80,7 +104,7 @@ export function Main({ items }: MainProps) {
                           const isChildActive = currentPath === child.path
 
                           return (
-                            <SidebarMenuSubItem key={child.title}>
+                            <SidebarMenuSubItem key={child.path}>
                               <SidebarMenuSubButton
                                 asChild
                                 isActive={isChildActive}

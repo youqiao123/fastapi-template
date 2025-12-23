@@ -28,8 +28,8 @@ export function WorkspacePage() {
       >
         <div
           className={cn(
-            "w-full flex-1 transition-[max-width] duration-200 ease-linear lg:mx-auto",
-            isArtifactsOpen ? "lg:max-w-full" : "lg:max-w-3xl",
+            "w-full flex-1 transition-[max-width] duration-200 ease-linear",
+            isArtifactsOpen ? "lg:max-w-full" : "lg:max-w-4xl",
           )}
         >
           <ChatPanel />

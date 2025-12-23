@@ -101,6 +101,7 @@ class ItemsPublic(SQLModel):
 # Shared properties
 class ConversationThreadBase(SQLModel):
     status: str = Field(default="active", max_length=32)
+    title: str | None = Field(default=None, max_length=255)
     metadata_: dict[str, Any] | None = Field(
         default=None,
         sa_column=sa.Column("metadata", sa.JSON),
