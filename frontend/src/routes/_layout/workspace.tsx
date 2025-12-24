@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_layout/workspace")({
   head: () => ({
     meta: [
       {
-        title: "Workspace - FastAPI Cloud",
+        title: "Workspace - TPDagent Cloud",
       },
     ],
   }),
