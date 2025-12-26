@@ -1,7 +1,25 @@
+type SSEPayload = Record<string, unknown>
+
 export type SSEMessage = {
   event: string
   data: string
   id?: string
+  payload?: SSEPayload
+}
+
+const parseJSONPayload = (raw: string): SSEPayload | null => {
+  if (!raw) {
+    return null
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as SSEPayload
+    }
+  } catch {
+    // ignore invalid JSON
+  }
+  return null
 }
 
 const parseSSEMessage = (raw: string): SSEMessage | null => {
@@ -31,11 +49,33 @@ const parseSSEMessage = (raw: string): SSEMessage | null => {
     return null
   }
 
+  const data = dataLines.join("\n")
+  const payload = parseJSONPayload(data) ?? undefined
+
   return {
     event,
-    data: dataLines.join("\n"),
+    data,
     id,
+    payload,
   }
+}
+
+export const getSSEText = (message: SSEMessage): string | null => {
+  const payload = message.payload ?? parseJSONPayload(message.data)
+
+  if (message.event === "token") {
+    return typeof payload?.token === "string" ? payload.token : null
+  }
+
+  if (message.event === "on_tool_start" || message.event === "on_tool_end") {
+    return null
+  }
+
+  if (typeof payload?.delta === "string") {
+    return payload.delta
+  }
+
+  return message.data
 }
 
 export async function readSSE(

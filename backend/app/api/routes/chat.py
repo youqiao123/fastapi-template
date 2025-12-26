@@ -5,6 +5,7 @@ from typing import AsyncIterator
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlmodel import func, select
 from starlette.responses import StreamingResponse
 
@@ -23,6 +24,11 @@ AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:9001")
 STATUS_ACTIVE = "active"
 STATUS_ARCHIVED = "archived"
 STATUS_DELETED = "deleted"
+
+
+class MessageItem(BaseModel):
+    role: str
+    content: str
 
 
 def _get_thread(
@@ -91,6 +97,28 @@ async def chat_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get(
+    "/messages",
+    response_model=list[MessageItem],
+    dependencies=[Depends(get_current_user)],
+)
+async def get_messages(
+    session: SessionDep,
+    current_user: CurrentUser,
+    thread_id: str = Query(..., min_length=1),
+) -> list[MessageItem]:
+    _get_thread(session, current_user, thread_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{AGENT_BASE_URL}/agent/get_messages",
+            params={"thread_id": thread_id},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    return [MessageItem.model_validate(item) for item in data]
 
 
 @router.post("/threads", response_model=ConversationThreadPublic)

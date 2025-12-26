@@ -2,24 +2,29 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 
+import { CancelError } from "@/client"
 import { ChatPanel, type ChatMessage } from "@/components/Workspace/ChatPanel"
 import ChatInput from "@/components/Workspace/ChatInput"
-import { readSSE } from "@/lib/sse"
+import { listMessages, type MessageItem } from "@/lib/messages"
+import { getSSEText, readSSE } from "@/lib/sse"
 import { createThread, THREADS_QUERY_KEY } from "@/lib/threads"
 
 const PENDING_MESSAGE_KEY = "workspace.pending-message"
 
-const parseDelta = (raw: string) => {
-  try {
-    const payload = JSON.parse(raw)
-    if (typeof payload?.delta === "string") {
-      return payload.delta
-    }
-  } catch {
-    // fall back to raw data
+const normalizeRole = (role: string): ChatMessage["role"] => {
+  if (role === "user" || role === "assistant" || role === "system") {
+    return role
   }
-  return raw
+  return "assistant"
 }
+
+const mapHistoryMessages = (items: MessageItem[], threadId: string) =>
+  items.map((item, index) => ({
+    id: `${threadId}-${index}`,
+    role: normalizeRole(item.role),
+    content: item.content,
+    status: "done" as const,
+  }))
 
 type ChatPanelContainerProps = {
   threadId?: string
@@ -46,6 +51,7 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
   const [isCreatingThread, setIsCreatingThread] = useState(false)
   const controllerRef = useRef<AbortController | null>(null)
   const assistantMessageIdRef = useRef<string | null>(null)
+  const historyRequestRef = useRef<ReturnType<typeof listMessages> | null>(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -153,7 +159,10 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
             return
           }
 
-          const delta = parseDelta(message.data)
+          const delta = getSSEText(message)
+          if (!delta) {
+            return
+          }
           appendAssistantDelta(delta)
           setStatus("streaming")
         })
@@ -189,6 +198,41 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
     setStatus("idle")
     setError(null)
     setIsStreaming(false)
+  }, [activeThreadId])
+
+  useEffect(() => {
+    if (!activeThreadId) {
+      return
+    }
+
+    historyRequestRef.current?.cancel()
+    const request = listMessages(activeThreadId)
+    historyRequestRef.current = request
+    setStatus("loading history")
+    setError(null)
+    let isActive = true
+
+    request
+      .then((items) => {
+        if (!isActive) {
+          return
+        }
+        const history = mapHistoryMessages(items, activeThreadId)
+        setMessages((prev) => (prev.length ? [...history, ...prev] : history))
+        setStatus((prev) => (prev === "loading history" ? "idle" : prev))
+      })
+      .catch((err) => {
+        if (!isActive || err instanceof CancelError) {
+          return
+        }
+        setStatus((prev) => (prev === "loading history" ? "error" : prev))
+        setError(err instanceof Error ? err.message : "Unknown error")
+      })
+
+    return () => {
+      isActive = false
+      request.cancel()
+    }
   }, [activeThreadId])
 
   useEffect(() => {

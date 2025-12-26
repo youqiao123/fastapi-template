@@ -11,7 +11,7 @@ type WorkspacePageProps = {
 }
 
 export function WorkspacePage({ threadId }: WorkspacePageProps) {
-  const [isArtifactsOpen, setIsArtifactsOpen] = useState(true)
+  const [isArtifactsOpen, setIsArtifactsOpen] = useState(false)
   const artifactsLabel = isArtifactsOpen
     ? "Hide artifacts panel"
     : "Show artifacts panel"
