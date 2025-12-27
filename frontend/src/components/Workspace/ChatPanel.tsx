@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ChevronDown } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -57,6 +59,11 @@ function MessageItem({ message }: { message: ChatMessage }) {
     isPending && "text-muted-foreground italic",
   )
 
+  const markdownClass = cn(
+    "space-y-2 text-sm leading-relaxed",
+    isPending && "text-muted-foreground italic",
+  )
+
   const placeholder = !message.content && isPending ? "Preparing response..." : ""
   const content = message.content || placeholder
 
@@ -68,7 +75,59 @@ function MessageItem({ message }: { message: ChatMessage }) {
             <span className="size-2 animate-pulse rounded-full bg-foreground/50" />
           </span>
         ) : null}
-        {content ? <p className={textClass}>{content}</p> : null}
+        {content ? (
+          isAssistant ? (
+            <div className={markdownClass}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: (props) => <p className="whitespace-pre-wrap" {...props} />,
+                  a: (props) => (
+                    <a
+                      className="text-primary underline underline-offset-4"
+                      target="_blank"
+                      rel="noreferrer"
+                      {...props}
+                    />
+                  ),
+                  ul: (props) => <ul className="list-disc pl-5" {...props} />,
+                  ol: (props) => <ol className="list-decimal pl-5" {...props} />,
+                  li: (props) => <li className="my-1" {...props} />,
+                  code: ({ inline, className, children, ...props }) =>
+                    inline ? (
+                      <code
+                        className="rounded bg-muted px-1 py-0.5 text-xs"
+                        {...props}
+                      >
+                        {children}
+                      </code>
+                    ) : (
+                      <code
+                        className={cn(
+                          "block rounded-md bg-muted p-3 text-xs",
+                          className,
+                        )}
+                        {...props}
+                      >
+                        {children}
+                      </code>
+                    ),
+                  pre: (props) => <pre className="overflow-x-auto" {...props} />,
+                  blockquote: (props) => (
+                    <blockquote
+                      className="border-l-2 border-border pl-3 text-muted-foreground"
+                      {...props}
+                    />
+                  ),
+                }}
+              >
+                {content}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <p className={textClass}>{content}</p>
+          )
+        ) : null}
         {isError ? (
           <div className="rounded-md border border-destructive/60 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
             Generation failed.
