@@ -47,7 +47,7 @@ function MessageItem({ message }: { message: ChatMessage }) {
   const bodyClass = cn(
     "flex flex-col gap-2 text-sm leading-relaxed",
     isUser
-      ? "max-w-[75%] rounded-2xl border border-border/60 bg-muted/70 px-4 py-2 text-foreground"
+      ? "max-w-[75%] rounded-2xl border border-border/60 bg-muted/70 px-4 py-2 text-foreground dark:bg-muted-foreground/30"
       : isSystem
         ? "max-w-[85%] rounded-md border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
         : "w-full text-foreground",

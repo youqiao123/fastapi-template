@@ -61,7 +61,7 @@ function Layout() {
     <SidebarProvider className={cn(isWorkspaceRoute && "h-svh overflow-hidden")}>
       <AppSidebar />
       <SidebarInset className={cn(isWorkspaceRoute && "min-h-0")}>
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 px-4">
           <SidebarTrigger className="-ml-1 text-muted-foreground" />
           <h1 className="text-lg font-semibold text-foreground truncate">
             {pageTitle}
@@ -69,8 +69,10 @@ function Layout() {
         </header>
         <main
           className={cn(
-            "flex-1 p-6 md:p-8",
-            isWorkspaceRoute && "flex min-h-0 flex-col overflow-hidden",
+            "flex-1",
+            isWorkspaceRoute
+              ? "flex min-h-0 flex-col overflow-hidden px-4 pb-4"
+              : "p-6 md:p-8",
           )}
         >
           <div

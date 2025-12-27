@@ -1,4 +1,10 @@
-import { useState } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from "react"
 import { PanelRightIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -10,36 +16,254 @@ type WorkspacePageProps = {
   threadId?: string
 }
 
+const GUTTER_WIDTH = 16
+const DEFAULT_CHAT_WIDTH = 40 * 16
+const MIN_CHAT_WIDTH = 20 * 16
+const MIN_ARTIFACT_WIDTH = 20 * 16
+const COLLAPSED_ARTIFACT_WIDTH = 3 * 16
+const CLOSE_ANIMATION_MS = 200
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max)
+
 export function WorkspacePage({ threadId }: WorkspacePageProps) {
   const [isArtifactsOpen, setIsArtifactsOpen] = useState(false)
-  const artifactsLabel = isArtifactsOpen
+  const [isArtifactsClosing, setIsArtifactsClosing] = useState(false)
+  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH)
+  const [isDragging, setIsDragging] = useState(false)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const chatWidthRef = useRef(chatWidth)
+  const closeTimeoutRef = useRef<number | null>(null)
+  const lastOpenChatWidthRef = useRef(DEFAULT_CHAT_WIDTH)
+  const dragStateRef = useRef<{
+    startX: number
+    startWidth: number
+    containerWidth: number
+  } | null>(null)
+  const pointerIdRef = useRef<number | null>(null)
+  const isArtifactsVisible = isArtifactsOpen || isArtifactsClosing
+  const isArtifactsExpanded = isArtifactsOpen && !isArtifactsClosing
+  const artifactsLabel = isArtifactsExpanded
     ? "Hide artifacts panel"
     : "Show artifacts panel"
+  const resizeVars = isArtifactsVisible
+    ? ({
+        "--chat-width": `${chatWidth}px`,
+        "--chat-min-width": `${MIN_CHAT_WIDTH}px`,
+        "--artifact-min-width": `${MIN_ARTIFACT_WIDTH}px`,
+      } as CSSProperties)
+    : undefined
+
+  useEffect(() => {
+    chatWidthRef.current = chatWidth
+  }, [chatWidth])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        window.clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isArtifactsExpanded) {
+      return
+    }
+
+    const handleResize = () => {
+      const container = containerRef.current
+      if (!container) {
+        return
+      }
+
+      const { width } = container.getBoundingClientRect()
+      const maxChatWidth = Math.max(
+        MIN_CHAT_WIDTH,
+        width - GUTTER_WIDTH - MIN_ARTIFACT_WIDTH,
+      )
+      const nextWidth = clamp(
+        chatWidthRef.current,
+        MIN_CHAT_WIDTH,
+        maxChatWidth,
+      )
+
+      if (nextWidth === chatWidthRef.current) {
+        return
+      }
+
+      setChatWidth(nextWidth)
+      lastOpenChatWidthRef.current = nextWidth
+    }
+
+    handleResize()
+    window.addEventListener("resize", handleResize)
+
+    return () => window.removeEventListener("resize", handleResize)
+  }, [isArtifactsExpanded])
+
+  const openArtifacts = () => {
+    if (closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+
+    setIsArtifactsClosing(false)
+    setIsArtifactsOpen(true)
+    setChatWidth(lastOpenChatWidthRef.current)
+  }
+
+  const closeArtifacts = () => {
+    if (!isArtifactsOpen || isArtifactsClosing) {
+      return
+    }
+
+    const container = containerRef.current
+    if (!container) {
+      setIsArtifactsOpen(false)
+      return
+    }
+
+    const { width } = container.getBoundingClientRect()
+    lastOpenChatWidthRef.current = chatWidthRef.current
+    const targetChatWidth = Math.max(
+      MIN_CHAT_WIDTH,
+      width - GUTTER_WIDTH - COLLAPSED_ARTIFACT_WIDTH,
+    )
+
+    setChatWidth(targetChatWidth)
+    setIsArtifactsClosing(true)
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setIsArtifactsOpen(false)
+      setIsArtifactsClosing(false)
+      setChatWidth(lastOpenChatWidthRef.current)
+      closeTimeoutRef.current = null
+    }, CLOSE_ANIMATION_MS)
+  }
+
+  const handleToggleArtifacts = () => {
+    if (isArtifactsOpen && !isArtifactsClosing) {
+      closeArtifacts()
+      return
+    }
+
+    openArtifacts()
+  }
+
+  const handleGutterPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!isArtifactsExpanded || event.button !== 0) {
+      return
+    }
+
+    const container = containerRef.current
+    if (!container) {
+      return
+    }
+
+    const { width } = container.getBoundingClientRect()
+
+    dragStateRef.current = {
+      startX: event.clientX,
+      startWidth: chatWidth,
+      containerWidth: width,
+    }
+    pointerIdRef.current = event.pointerId
+    setIsDragging(true)
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.preventDefault()
+  }
+
+  const handleGutterPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (
+      !isDragging ||
+      !isArtifactsExpanded ||
+      pointerIdRef.current !== event.pointerId
+    ) {
+      return
+    }
+
+    const dragState = dragStateRef.current
+    if (!dragState) {
+      return
+    }
+
+    const delta = event.clientX - dragState.startX
+    const availableWidth = dragState.containerWidth - GUTTER_WIDTH
+    const maxChatWidth = Math.max(
+      MIN_CHAT_WIDTH,
+      availableWidth - MIN_ARTIFACT_WIDTH,
+    )
+
+    const nextWidth = clamp(
+      dragState.startWidth + delta,
+      MIN_CHAT_WIDTH,
+      maxChatWidth,
+    )
+
+    setChatWidth(nextWidth)
+    lastOpenChatWidthRef.current = nextWidth
+  }
+
+  const handleGutterPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    if (pointerIdRef.current !== event.pointerId) {
+      return
+    }
+
+    pointerIdRef.current = null
+    dragStateRef.current = null
+    setIsDragging(false)
+    event.currentTarget.releasePointerCapture(event.pointerId)
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <div
+        ref={containerRef}
+        style={resizeVars}
         className={cn(
-          "flex flex-1 min-h-0 flex-col gap-4 transition-[gap] duration-200 ease-linear lg:flex-row lg:items-stretch",
-          isArtifactsOpen ? "lg:gap-4" : "lg:gap-0",
+          "flex flex-1 min-h-0 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-0",
         )}
       >
         <div
           className={cn(
-            "order-1 w-full min-h-0 transition-[width,max-width] duration-200 ease-linear lg:flex lg:flex-col",
+            "order-1 w-full min-h-0 lg:flex lg:flex-col",
+            isDragging
+              ? "lg:transition-none"
+              : "transition-[width,max-width] duration-200 ease-linear",
             isArtifactsOpen
-              ? "lg:flex-none lg:w-80 lg:max-w-80"
+              ? "lg:flex-none lg:max-w-none lg:w-[var(--chat-width)] lg:min-w-[var(--chat-min-width)]"
               : "lg:flex-1 lg:max-w-4xl lg:mx-auto",
           )}
         >
           <ChatPanelContainer threadId={threadId} />
         </div>
+        {isArtifactsVisible ? (
+          <div
+            role="separator"
+            aria-label="Resize panels"
+            aria-orientation="vertical"
+            className={cn(
+              "panel-gutter group order-2 hidden w-4 items-stretch justify-center touch-none select-none lg:flex",
+              isDragging ? "bg-muted/40" : "hover:bg-muted/40",
+              isArtifactsExpanded ? "cursor-col-resize" : "cursor-default",
+              isArtifactsExpanded ? "pointer-events-auto" : "pointer-events-none",
+            )}
+            onPointerDown={handleGutterPointerDown}
+            onPointerMove={handleGutterPointerMove}
+            onPointerUp={handleGutterPointerUp}
+            onPointerCancel={handleGutterPointerUp}
+          />
+        ) : null}
         <div
           className={cn(
-            "order-2 flex w-full min-h-0 flex-col overflow-hidden rounded-lg border bg-muted/20 px-3 py-2 transition-[width,max-height,padding] duration-200 ease-linear lg:flex-none lg:h-full lg:ml-auto",
-            isArtifactsOpen
-              ? "gap-3 max-h-[500px] lg:max-h-none lg:w-[calc(100%-20rem-1rem)] lg:px-4 lg:py-4"
-              : "gap-0 max-h-14 lg:max-h-none lg:w-12 lg:px-2 lg:py-4",
+            "order-2 flex w-full min-h-0 flex-col overflow-hidden rounded-lg border bg-muted/20 px-3 py-2 lg:h-full",
+            isDragging
+              ? "lg:transition-none"
+              : "transition-[width,max-height,padding] duration-200 ease-linear",
+            isArtifactsExpanded
+              ? "gap-3 max-h-[500px] lg:max-h-none lg:flex-1 lg:min-w-[var(--artifact-min-width)] lg:px-4 lg:py-4"
+              : "gap-0 max-h-14 lg:max-h-none lg:w-12 lg:flex-none lg:px-2 lg:py-4",
           )}
         >
           <div
@@ -50,11 +274,11 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
           >
             <Button
               type="button"
-              variant={isArtifactsOpen ? "secondary" : "ghost"}
+              variant={isArtifactsExpanded ? "secondary" : "ghost"}
               size="icon-sm"
-              onClick={() => setIsArtifactsOpen((prev) => !prev)}
+              onClick={handleToggleArtifacts}
               aria-label={artifactsLabel}
-              aria-pressed={isArtifactsOpen}
+              aria-pressed={isArtifactsExpanded}
               title={artifactsLabel}
             >
               <PanelRightIcon />
@@ -63,7 +287,7 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
           <div
             className={cn(
               "min-h-0 flex-1 transition-[opacity,transform] duration-200 ease-linear",
-              isArtifactsOpen
+              isArtifactsExpanded
                 ? "opacity-100 translate-x-0"
                 : "pointer-events-none opacity-0 translate-x-3",
             )}
