@@ -39,6 +39,10 @@ export type Message = {
     message: string;
 };
 
+export type EmailVerification = {
+    token: string;
+};
+
 export type NewPassword = {
     token: string;
     new_password: string;
@@ -158,6 +162,18 @@ export type LoginResetPasswordData = {
 };
 
 export type LoginResetPasswordResponse = (Message);
+
+export type LoginResendVerificationEmailData = {
+    email: string;
+};
+
+export type LoginResendVerificationEmailResponse = (Message);
+
+export type LoginVerifyEmailData = {
+    requestBody: EmailVerification;
+};
+
+export type LoginVerifyEmailResponse = (Message);
 
 export type LoginRecoverPasswordHtmlContentData = {
     email: string;

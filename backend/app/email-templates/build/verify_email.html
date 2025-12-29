@@ -1,0 +1,48 @@
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title></title>
+  </head>
+  <body style="background-color:#fafbfc;margin:0;padding:0;">
+    <div style="background-color:#fafbfc;padding:0 0 30px;">
+      <div
+        style="background:#ffffff;max-width:600px;margin:0 auto;padding:40px 20px;text-align:center;"
+      >
+        <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;line-height:1;color:#333333;padding:35px 0;">
+          {{ project_name }} - Verify Your Email
+        </div>
+        <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.5;color:#555555;padding:6px 0;">
+          Hello {{ username }}
+        </div>
+        <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.5;color:#555555;padding:6px 0;">
+          Please verify your email address to complete your registration.
+        </div>
+        <div style="padding:18px 0;">
+          <a
+            href="{{ link }}"
+            style="background:#009688;color:#ffffff;font-family:Arial, Helvetica, sans-serif;font-size:18px;text-decoration:none;border-radius:8px;padding:10px 25px;display:inline-block;"
+            target="_blank"
+          >Verify email</a>
+        </div>
+        <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.5;color:#555555;padding:6px 0;">
+          Or copy and paste the following link into your browser:
+        </div>
+        <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.5;color:#555555;padding:6px 0;">
+          <a href="{{ link }}">{{ link }}</a>
+        </div>
+        <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.5;color:#555555;padding:6px 0;">
+          This link will expire in {{ valid_hours }} hours.
+        </div>
+        <div style="padding:16px 0;">
+          <hr style="border:0;border-top:2px solid #cccccc;width:100%;" />
+        </div>
+        <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:1.5;color:#555555;padding:6px 0;">
+          If you did not create this account, you can disregard this email.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

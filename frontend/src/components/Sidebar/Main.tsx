@@ -59,9 +59,10 @@ export function Main({ items }: MainProps) {
           {items.map((item) => {
             const isActive =
               currentPath === item.path ||
-              item.children?.some((child) => child.path === currentPath)
+              Boolean(item.children?.some((child) => child.path === currentPath))
 
-            const shouldShowChildren = Boolean(item.children?.length)
+            const children = item.children ?? []
+            const shouldShowChildren = children.length > 0
 
             return (
               <SidebarMenuItem key={item.title}>
@@ -85,7 +86,7 @@ export function Main({ items }: MainProps) {
                       event.stopPropagation()
                       item.action?.onClick()
                     }}
-                    disabled={item.action.disabled}
+                    disabled={item.action.disabled ?? false}
                   >
                     <item.action.icon />
                   </SidebarMenuAction>
@@ -102,7 +103,7 @@ export function Main({ items }: MainProps) {
                   >
                     <div className="min-h-0">
                       <SidebarMenuSub>
-                        {item.children.map((child) => {
+                        {children.map((child) => {
                           const isChildActive = currentPath === child.path
                           const hasThreadActions = Boolean(child.threadId)
 

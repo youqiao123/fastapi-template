@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,7 +25,12 @@ from app.models import (
     UserUpdate,
     UserUpdateMe,
 )
-from app.utils import generate_new_account_email, send_email
+from app.utils import (
+    generate_email_verification_email,
+    generate_email_verification_token,
+    generate_new_account_email,
+    send_email,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -151,7 +157,25 @@ def register_user(session: SessionDep, user_in: UserRegister) -> Any:
             detail="The user with this email already exists in the system",
         )
     user_create = UserCreate.model_validate(user_in)
-    user = crud.create_user(session=session, user_create=user_create)
+    is_verified = not settings.emails_enabled
+    user = crud.create_user(
+        session=session, user_create=user_create, is_verified=is_verified
+    )
+    if settings.emails_enabled and user_in.email:
+        email_verification_token = generate_email_verification_token(email=user.email)
+        email_data = generate_email_verification_email(
+            email_to=user.email,
+            username=user.full_name or user.email,
+            token=email_verification_token,
+        )
+        send_email(
+            email_to=user.email,
+            subject=email_data.subject,
+            html_content=email_data.html_content,
+        )
+        user.email_verification_sent_at = datetime.now(timezone.utc)
+        session.add(user)
+        session.commit()
     return user
 
 

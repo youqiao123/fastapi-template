@@ -93,11 +93,17 @@ function MessageItem({ message }: { message: ChatMessage }) {
                   ul: (props) => <ul className="list-disc pl-5" {...props} />,
                   ol: (props) => <ol className="list-decimal pl-5" {...props} />,
                   li: (props) => <li className="my-1" {...props} />,
-                  code: ({ inline, className, children, ...props }) =>
-                    inline ? (
+                  code: (props) => {
+                    const { className, children, node, ...rest } = props
+                    const position = node?.position
+                    const isInline = position
+                      ? position.start.line === position.end.line
+                      : !className
+
+                    return isInline ? (
                       <code
                         className="rounded bg-muted px-1 py-0.5 text-xs"
-                        {...props}
+                        {...rest}
                       >
                         {children}
                       </code>
@@ -107,11 +113,12 @@ function MessageItem({ message }: { message: ChatMessage }) {
                           "block rounded-md bg-muted p-3 text-xs",
                           className,
                         )}
-                        {...props}
+                        {...rest}
                       >
                         {children}
                       </code>
-                    ),
+                    )
+                  },
                   pre: (props) => <pre className="overflow-x-auto" {...props} />,
                   blockquote: (props) => (
                     <blockquote

@@ -302,6 +302,7 @@ def test_register_user(client: TestClient, db: Session) -> None:
     assert user_db.email == username
     assert user_db.full_name == full_name
     assert verify_password(password, user_db.hashed_password)
+    assert user_db.is_verified is (not settings.emails_enabled)
 
 
 def test_register_user_already_exists_error(client: TestClient) -> None:

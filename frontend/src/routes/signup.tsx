@@ -1,11 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation } from "@tanstack/react-query"
 import {
   createFileRoute,
   Link as RouterLink,
   redirect,
 } from "@tanstack/react-router"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { LoginService } from "@/client"
 import { AuthLayout } from "@/components/Common/AuthLayout"
 import {
   Form,
@@ -19,6 +22,8 @@ import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { PasswordInput } from "@/components/ui/password-input"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
+import { handleError } from "@/utils"
 
 const formSchema = z
   .object({
@@ -59,6 +64,10 @@ export const Route = createFileRoute("/signup")({
 
 function SignUp() {
   const { signUpMutation } = useAuth()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const [signupComplete, setSignupComplete] = useState(false)
+  const [signupEmail, setSignupEmail] = useState("")
+  const [resendCooldown, setResendCooldown] = useState(0)
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: "onBlur",
@@ -71,12 +80,69 @@ function SignUp() {
     },
   })
 
+  const resendMutation = useMutation({
+    mutationFn: () =>
+      LoginService.resendVerificationEmail({ email: signupEmail }),
+    onSuccess: (data) => {
+      showSuccessToast(data.message || "Verification email sent")
+      setResendCooldown(60)
+    },
+    onError: handleError.bind(showErrorToast),
+  })
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => {
+      setResendCooldown((current) => (current > 1 ? current - 1 : 0))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
+
   const onSubmit = (data: FormData) => {
     if (signUpMutation.isPending) return
 
     // exclude confirm_password from submission data
     const { confirm_password: _confirm_password, ...submitData } = data
-    signUpMutation.mutate(submitData)
+    setSignupEmail(submitData.email)
+    signUpMutation.mutate(submitData, {
+      onSuccess: () => {
+        setSignupComplete(true)
+        setResendCooldown(60)
+        showSuccessToast(
+          "Verification email sent. Please check your inbox to complete registration.",
+        )
+      },
+    })
+  }
+
+  if (signupComplete) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col gap-4 text-center">
+          <h1 className="text-2xl font-bold">Check your email</h1>
+          <p className="text-sm text-muted-foreground">
+            We sent a verification link to {signupEmail}. Click it to complete
+            your registration.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Didn&apos;t receive the email?{" "}
+            <button
+              type="button"
+              onClick={() => resendMutation.mutate()}
+              disabled={
+                resendCooldown > 0 ||
+                resendMutation.isPending ||
+                !signupEmail
+              }
+              className="underline underline-offset-4 disabled:opacity-60"
+            >
+              {resendMutation.isPending ? "Resending..." : "Resend email"}
+            </button>
+            {resendCooldown > 0 ? ` (${resendCooldown}s)` : null}
+          </p>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (

@@ -194,6 +194,18 @@ export const MessageSchema = {
     title: 'Message'
 } as const;
 
+export const EmailVerificationSchema = {
+    properties: {
+        token: {
+            type: 'string',
+            title: 'Token'
+        }
+    },
+    type: 'object',
+    required: ['token'],
+    title: 'EmailVerification'
+} as const;
+
 export const NewPasswordSchema = {
     properties: {
         token: {
@@ -229,7 +241,7 @@ export const PrivateUserCreateSchema = {
         is_verified: {
             type: 'boolean',
             title: 'Is Verified',
-            default: false
+            default: true
         }
     },
     type: 'object',

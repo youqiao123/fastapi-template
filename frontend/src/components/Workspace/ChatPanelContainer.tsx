@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { useNavigate, useRouterState } from "@tanstack/react-router"
+import { useNavigate } from "@tanstack/react-router"
 
 import { CancelError } from "@/client"
 import { ChatPanel, type ChatMessage } from "@/components/Workspace/ChatPanel"
@@ -31,18 +31,7 @@ type ChatPanelContainerProps = {
 }
 
 export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
-  const routeThreadId = useRouterState({
-    select: (state) => {
-      const matches = [...state.matches].reverse()
-      for (const match of matches) {
-        if (typeof match.params?.threadId === "string") {
-          return match.params.threadId
-        }
-      }
-      return undefined
-    },
-  })
-  const activeThreadId = threadId ?? routeThreadId
+  const activeThreadId = threadId
   const [draft, setDraft] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [status, setStatus] = useState("idle")

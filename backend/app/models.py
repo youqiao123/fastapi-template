@@ -46,6 +46,11 @@ class UpdatePassword(SQLModel):
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
+    is_verified: bool = Field(default=True)
+    email_verification_sent_at: datetime | None = Field(
+        default=None,
+        sa_column=sa.Column(sa.DateTime(timezone=True), nullable=True),
+    )
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
     conversation_threads: list["ConversationThread"] = Relationship(
         back_populates="user", cascade_delete=True
@@ -161,3 +166,7 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class EmailVerification(SQLModel):
+    token: str

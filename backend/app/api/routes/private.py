@@ -17,7 +17,7 @@ class PrivateUserCreate(BaseModel):
     email: str
     password: str
     full_name: str
-    is_verified: bool = False
+    is_verified: bool = True
 
 
 @router.post("/users/", response_model=UserPublic)
@@ -30,6 +30,7 @@ def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
         email=user_in.email,
         full_name=user_in.full_name,
         hashed_password=get_password_hash(user_in.password),
+        is_verified=user_in.is_verified,
     )
 
     session.add(user)

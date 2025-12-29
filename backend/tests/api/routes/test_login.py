@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -7,7 +8,10 @@ from app.core.config import settings
 from app.core.security import verify_password
 from app.crud import create_user
 from app.models import UserCreate
-from app.utils import generate_password_reset_token
+from app.utils import (
+    generate_email_verification_token,
+    generate_password_reset_token,
+)
 from tests.utils.user import user_authentication_headers
 from tests.utils.utils import random_email, random_lower_string
 
@@ -31,6 +35,23 @@ def test_get_access_token_incorrect_password(client: TestClient) -> None:
     }
     r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
     assert r.status_code == 400
+
+
+def test_login_unverified_user(client: TestClient, db: Session) -> None:
+    email = random_email()
+    password = random_lower_string()
+    user_create = UserCreate(
+        email=email,
+        full_name="Test User",
+        password=password,
+        is_active=True,
+        is_superuser=False,
+    )
+    create_user(session=db, user_create=user_create, is_verified=False)
+    login_data = {"username": email, "password": password}
+    r = client.post(f"{settings.API_V1_STR}/login/access-token", data=login_data)
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Email not verified. Please check your inbox."
 
 
 def test_use_access_token(
@@ -116,3 +137,85 @@ def test_reset_password_invalid_token(
     assert "detail" in response
     assert r.status_code == 400
     assert response["detail"] == "Invalid token"
+
+
+def test_verify_email(client: TestClient, db: Session) -> None:
+    email = random_email()
+    password = random_lower_string()
+    user_create = UserCreate(
+        email=email,
+        full_name="Test User",
+        password=password,
+        is_active=True,
+        is_superuser=False,
+    )
+    user = create_user(session=db, user_create=user_create, is_verified=False)
+    token = generate_email_verification_token(email=email)
+    r = client.post(
+        f"{settings.API_V1_STR}/verify-email/",
+        json={"token": token},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"message": "Email verified successfully"}
+    db.refresh(user)
+    assert user.is_verified
+
+
+def test_verify_email_invalid_token(client: TestClient) -> None:
+    r = client.post(
+        f"{settings.API_V1_STR}/verify-email/",
+        json={"token": "invalid"},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Invalid token"
+
+
+def test_resend_verification_email(client: TestClient, db: Session) -> None:
+    email = random_email()
+    password = random_lower_string()
+    user_create = UserCreate(
+        email=email,
+        full_name="Test User",
+        password=password,
+        is_active=True,
+        is_superuser=False,
+    )
+    user = create_user(session=db, user_create=user_create, is_verified=False)
+    user.email_verification_sent_at = datetime.now(timezone.utc) - timedelta(minutes=2)
+    db.add(user)
+    db.commit()
+
+    with (
+        patch("app.utils.send_email", return_value=None),
+        patch("app.core.config.settings.SMTP_HOST", "smtp.example.com"),
+        patch("app.core.config.settings.SMTP_USER", "admin@example.com"),
+    ):
+        r = client.post(f"{settings.API_V1_STR}/verify-email/resend/{email}")
+    assert r.status_code == 200
+    assert r.json() == {"message": "Verification email sent"}
+
+
+def test_resend_verification_email_rate_limit(
+    client: TestClient, db: Session
+) -> None:
+    email = random_email()
+    password = random_lower_string()
+    user_create = UserCreate(
+        email=email,
+        full_name="Test User",
+        password=password,
+        is_active=True,
+        is_superuser=False,
+    )
+    user = create_user(session=db, user_create=user_create, is_verified=False)
+    user.email_verification_sent_at = datetime.now(timezone.utc)
+    db.add(user)
+    db.commit()
+
+    with (
+        patch("app.utils.send_email", return_value=None),
+        patch("app.core.config.settings.SMTP_HOST", "smtp.example.com"),
+        patch("app.core.config.settings.SMTP_USER", "admin@example.com"),
+    ):
+        r = client.post(f"{settings.API_V1_STR}/verify-email/resend/{email}")
+    assert r.status_code == 429

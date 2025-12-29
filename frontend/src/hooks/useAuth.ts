@@ -29,9 +29,6 @@ const useAuth = () => {
   const signUpMutation = useMutation({
     mutationFn: (data: UserRegister) =>
       UsersService.registerUser({ requestBody: data }),
-    onSuccess: () => {
-      navigate({ to: "/login" })
-    },
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] })
