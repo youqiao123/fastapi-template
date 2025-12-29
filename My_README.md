@@ -9,6 +9,9 @@ docker exec -it fastapi-template-db-1 psql -U postgres -d app
 docker exec -it fastapi-template-db-1 psql -U agent_user -d app
 docker exec -it fastapi-template-db-1 psql "postgresql://agent_user:YouqiaoQian_agent@localhost:5432/app"
 
+docker compose build --no-cache backend && docker compose up -d backend
+docker compose build --no-cache frontend && docker compose up -d frontend
+
 ## 在db容器里创建agent schema
 
 目标只有一个：
