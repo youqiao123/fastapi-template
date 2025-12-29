@@ -52,7 +52,10 @@ export function AppSidebar() {
       queryClient.invalidateQueries({ queryKey: THREADS_QUERY_KEY })
       setIsCreateDialogOpen(false)
       if (thread?.thread_id) {
-        navigate({ to: `/workspace/${thread.thread_id}` })
+        navigate({
+          to: "/workspace/$threadId",
+          params: { threadId: thread.thread_id },
+        })
       } else {
         navigate({ to: "/workspace" })
       }

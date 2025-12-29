@@ -63,7 +63,8 @@ function ThreadCard({ thread, index }: ThreadCardProps) {
 
   return (
     <Link
-      to={`/workspace/${thread.thread_id}`}
+      to="/workspace/$threadId"
+      params={{ threadId: thread.thread_id }}
       className={cn(
         "group relative flex min-h-[220px] flex-col justify-between overflow-hidden rounded-[24px] border border-border/60 bg-background/80 p-6 text-left shadow-sm transition will-change-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:bg-muted/30",
         "animate-in fade-in-0 slide-in-from-bottom-4 duration-500",
@@ -114,7 +115,10 @@ export function WorkspaceIndexPage() {
       queryClient.invalidateQueries({ queryKey: THREADS_QUERY_KEY })
       setIsCreateDialogOpen(false)
       if (thread?.thread_id) {
-        navigate({ to: `/workspace/${thread.thread_id}` })
+        navigate({
+          to: "/workspace/$threadId",
+          params: { threadId: thread.thread_id },
+        })
       } else {
         navigate({ to: "/workspace" })
       }
