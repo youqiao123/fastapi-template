@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
-
 import { CancelError } from "@/client"
 import { ChatPanel, type ChatMessage } from "@/components/Workspace/ChatPanel"
 import ChatInput from "@/components/Workspace/ChatInput"
+import { apiBase } from "@/lib/api"
 import { listMessages, type MessageItem } from "@/lib/messages"
 import { getSSEText, readSSE } from "@/lib/sse"
-import { createThread, THREADS_QUERY_KEY } from "@/lib/threads"
-
-const PENDING_MESSAGE_KEY = "workspace.pending-message"
 
 const normalizeRole = (role: string): ChatMessage["role"] => {
   if (role === "user" || role === "assistant" || role === "system") {
@@ -37,12 +32,9 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
   const [status, setStatus] = useState("idle")
   const [error, setError] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
-  const [isCreatingThread, setIsCreatingThread] = useState(false)
   const controllerRef = useRef<AbortController | null>(null)
   const assistantMessageIdRef = useRef<string | null>(null)
   const historyRequestRef = useRef<ReturnType<typeof listMessages> | null>(null)
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
 
   const setAssistantStatus = useCallback((nextStatus: ChatMessage["status"]) => {
     const targetId = assistantMessageIdRef.current
@@ -108,7 +100,6 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
         },
       ])
 
-      const apiBase = import.meta.env.VITE_API_URL ?? ""
       const url = `${apiBase}/api/v1/chat/stream?q=${encodeURIComponent(message)}&thread_id=${encodeURIComponent(activeThreadId)}`
       const token = localStorage.getItem("access_token") ?? ""
       let didError = false
@@ -224,55 +215,13 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
     }
   }, [activeThreadId])
 
-  useEffect(() => {
-    if (!activeThreadId) {
-      return
-    }
-    const pendingRaw = sessionStorage.getItem(PENDING_MESSAGE_KEY)
-    if (!pendingRaw) {
-      return
-    }
-    try {
-      const pending = JSON.parse(pendingRaw) as {
-        threadId: string
-        message: string
-      }
-      if (pending.threadId !== activeThreadId || !pending.message) {
-        return
-      }
-      sessionStorage.removeItem(PENDING_MESSAGE_KEY)
-      void startStream(activeThreadId, pending.message)
-    } catch {
-      sessionStorage.removeItem(PENDING_MESSAGE_KEY)
-    }
-  }, [activeThreadId, startStream])
-
   const handleSend = async (message: string) => {
-    if (isStreaming || isCreatingThread) {
+    if (isStreaming) {
       return
     }
     if (!activeThreadId) {
-      setIsCreatingThread(true)
-      setError(null)
-      try {
-        const thread = await createThread()
-        const newThreadId = thread?.thread_id
-        if (!newThreadId) {
-          throw new Error("Failed to create thread")
-        }
-        queryClient.invalidateQueries({ queryKey: THREADS_QUERY_KEY })
-        sessionStorage.setItem(
-          PENDING_MESSAGE_KEY,
-          JSON.stringify({ threadId: newThreadId, message }),
-        )
-        navigate({ to: `/workspace/${newThreadId}` })
-        setDraft("")
-      } catch (err) {
-        setStatus("error")
-        setError(err instanceof Error ? err.message : "Unknown error")
-      } finally {
-        setIsCreatingThread(false)
-      }
+      setStatus("error")
+      setError("Please create a thread before sending a message.")
       return
     }
 
@@ -280,11 +229,8 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
     void startStream(activeThreadId, message)
   }
 
-  const statusLabel = isCreatingThread
-    ? "Creating thread..."
-    : status !== "idle"
-      ? `Status: ${status}`
-      : "Ready"
+  const statusLabel =
+    status !== "idle" ? `Status: ${status}` : "Ready"
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-3 rounded-lg border bg-muted/20 p-4">
@@ -303,7 +249,7 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
         value={draft}
         onChange={setDraft}
         onSend={handleSend}
-        disabled={isStreaming || isCreatingThread}
+        disabled={isStreaming}
         placeholder="Ask a question..."
       />
     </section>

@@ -9,10 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RecoverPasswordRouteImport } from './routes/recover-password'
-import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
@@ -20,8 +20,14 @@ import { Route as LayoutWorkspaceRouteImport } from './routes/_layout/workspace'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
+import { Route as LayoutWorkspaceIndexRouteImport } from './routes/_layout/workspace.index'
 import { Route as LayoutWorkspaceThreadIdRouteImport } from './routes/_layout/workspace.$threadId'
 
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -35,11 +41,6 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RecoverPasswordRoute = RecoverPasswordRouteImport.update({
   id: '/recover-password',
   path: '/recover-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VerifyEmailRoute = VerifyEmailRouteImport.update({
-  id: '/verify-email',
-  path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -76,6 +77,11 @@ const LayoutAdminRoute = LayoutAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutWorkspaceIndexRoute = LayoutWorkspaceIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LayoutWorkspaceRoute,
+} as any)
 const LayoutWorkspaceThreadIdRoute = LayoutWorkspaceThreadIdRouteImport.update({
   id: '/$threadId',
   path: '/$threadId',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/': typeof LayoutIndexRoute
   '/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
+  '/workspace/': typeof LayoutWorkspaceIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -104,9 +111,9 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
-  '/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/': typeof LayoutIndexRoute
   '/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
+  '/workspace': typeof LayoutWorkspaceIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,6 +129,7 @@ export interface FileRoutesById {
   '/_layout/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
+  '/_layout/workspace/': typeof LayoutWorkspaceIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,6 +145,7 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/'
     | '/workspace/$threadId'
+    | '/workspace/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -147,9 +156,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/items'
     | '/settings'
-    | '/workspace'
     | '/'
     | '/workspace/$threadId'
+    | '/workspace'
   id:
     | '__root__'
     | '/_layout'
@@ -164,6 +173,7 @@ export interface FileRouteTypes {
     | '/_layout/workspace'
     | '/_layout/'
     | '/_layout/workspace/$threadId'
+    | '/_layout/workspace/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -177,6 +187,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -196,13 +213,6 @@ declare module '@tanstack/react-router' {
       path: '/recover-password'
       fullPath: '/recover-password'
       preLoaderRoute: typeof RecoverPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/verify-email': {
-      id: '/verify-email'
-      path: '/verify-email'
-      fullPath: '/verify-email'
-      preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -254,6 +264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/workspace/': {
+      id: '/_layout/workspace/'
+      path: '/'
+      fullPath: '/workspace/'
+      preLoaderRoute: typeof LayoutWorkspaceIndexRouteImport
+      parentRoute: typeof LayoutWorkspaceRoute
+    }
     '/_layout/workspace/$threadId': {
       id: '/_layout/workspace/$threadId'
       path: '/$threadId'
@@ -266,10 +283,12 @@ declare module '@tanstack/react-router' {
 
 interface LayoutWorkspaceRouteChildren {
   LayoutWorkspaceThreadIdRoute: typeof LayoutWorkspaceThreadIdRoute
+  LayoutWorkspaceIndexRoute: typeof LayoutWorkspaceIndexRoute
 }
 
 const LayoutWorkspaceRouteChildren: LayoutWorkspaceRouteChildren = {
   LayoutWorkspaceThreadIdRoute: LayoutWorkspaceThreadIdRoute,
+  LayoutWorkspaceIndexRoute: LayoutWorkspaceIndexRoute,
 }
 
 const LayoutWorkspaceRouteWithChildren = LayoutWorkspaceRoute._addFileChildren(

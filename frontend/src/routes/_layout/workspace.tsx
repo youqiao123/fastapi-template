@@ -1,18 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router"
-
-import { WorkspacePage } from "@/components/Workspace/WorkspacePage"
+import { createFileRoute, Outlet } from "@tanstack/react-router"
 
 export const Route = createFileRoute("/_layout/workspace")({
-  component: WorkspaceRoute,
-  head: () => ({
-    meta: [
-      {
-        title: "Workspace - TPDagent Cloud",
-      },
-    ],
-  }),
+  component: WorkspaceLayout,
 })
 
-function WorkspaceRoute() {
-  return <WorkspacePage />
+function WorkspaceLayout() {
+  return <Outlet />
 }

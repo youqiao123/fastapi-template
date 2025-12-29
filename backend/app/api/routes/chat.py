@@ -13,18 +13,27 @@ from app.api.deps import CurrentUser, SessionDep, get_current_user
 from app.core.ids import generate_ulid
 from app.models import (
     ConversationThread,
+    ConversationThreadCreate,
     ConversationThreadPublic,
     ConversationThreadsPublic,
     ConversationThreadUpdate,
 )
 
 router = APIRouter(tags=["chat"])
-AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:9001")
+AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", None)
+if not AGENT_BASE_URL:
+    raise RuntimeError("AGENT_BASE_URL is not set")
 
 STATUS_ACTIVE = "active"
 STATUS_ARCHIVED = "archived"
 STATUS_DELETED = "deleted"
 
+timeout = httpx.Timeout(
+    connect=10.0,
+    read=None,
+    write=10.0,
+    pool=10.0,
+)
 
 class MessageItem(BaseModel):
     role: str
@@ -50,16 +59,6 @@ def _get_thread(
     return thread
 
 
-# TODO: 把sse迁移到agent服务中
-# def sse(event: str, data: dict, event_id: int | None = None) -> str:
-#     # SSE 格式：可选 id + event + data，每个事件以空行结束
-#     msg = ""
-#     if event_id is not None:
-#         msg += f"id: {event_id}\n"
-#     msg += f"event: {event}\n"
-#     msg += f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-#     return msg
-
 @router.get("/chat/stream", dependencies=[Depends(get_current_user)])
 async def chat_stream(
     session: SessionDep,
@@ -77,7 +76,7 @@ async def chat_stream(
             "thread_id": thread_id,
         }
 
-        async with httpx.AsyncClient(timeout=None) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
                 "POST",
                 f"{AGENT_BASE_URL}/agent/chat",
@@ -110,7 +109,7 @@ async def get_messages(
     thread_id: str = Query(..., min_length=1),
 ) -> list[MessageItem]:
     _get_thread(session, current_user, thread_id)
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.get(
             f"{AGENT_BASE_URL}/agent/get_messages",
             params={"thread_id": thread_id},
@@ -122,10 +121,15 @@ async def get_messages(
 
 
 @router.post("/threads", response_model=ConversationThreadPublic)
-def create_thread(session: SessionDep, current_user: CurrentUser) -> ConversationThread:
+def create_thread(
+    session: SessionDep,
+    current_user: CurrentUser,
+    thread_in: ConversationThreadCreate,
+) -> ConversationThread:
     thread = ConversationThread(
         thread_id=generate_ulid(),
         user_id=current_user.id,
+        title=thread_in.title,
         status=STATUS_ACTIVE,
     )
     session.add(thread)

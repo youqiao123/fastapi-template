@@ -15,6 +15,10 @@ export type ConversationThreadsResponse = {
   count: number
 }
 
+export type ConversationThreadCreate = {
+  title: string
+}
+
 export const THREADS_QUERY_KEY = ["threads"] as const
 
 export const getThreadTitle = (title?: string | null) => {
@@ -30,10 +34,12 @@ export const listThreads = () =>
     url: "/api/v1/threads",
   })
 
-export const createThread = () =>
+export const createThread = (data: ConversationThreadCreate) =>
   request<ConversationThread>(OpenAPI, {
     method: "POST",
     url: "/api/v1/threads",
+    body: data,
+    mediaType: "application/json",
   })
 
 export type ConversationThreadUpdate = {

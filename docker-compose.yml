@@ -13,8 +13,8 @@ services:
       - app-db-data:/var/lib/postgresql/data/pgdata
     env_file:
       - .env
-    ports:     # python进程如果不在docker-compose下，需要用localhost:port
-      - "5432:5432"
+    # ports:     # python进程如果不在docker-compose下，需要用localhost:port
+    #   - "5432:5432"
     environment:
       - PGDATA=/var/lib/postgresql/data/pgdata
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
@@ -80,6 +80,10 @@ services:
   backend:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      # Force an IPv4-only host alias for reaching services running on the Docker host.
+      # - "dockerhost:host-gateway"
     networks:
       - traefik-public
       - default

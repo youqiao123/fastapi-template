@@ -7,7 +7,9 @@ import {
   Plus,
   Users,
 } from "lucide-react"
+import { useState } from "react"
 
+import { CreateThreadDialog } from "@/components/Common/CreateThreadDialog"
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
 import {
@@ -41,11 +43,14 @@ export function AppSidebar() {
     queryFn: listThreads,
   })
 
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+
   const createThreadMutation = useMutation({
-    mutationFn: createThread,
+    mutationFn: (title: string) => createThread({ title }),
     onSuccess: (thread) => {
       showSuccessToast("Thread created")
       queryClient.invalidateQueries({ queryKey: THREADS_QUERY_KEY })
+      setIsCreateDialogOpen(false)
       if (thread?.thread_id) {
         navigate({ to: `/workspace/${thread.thread_id}` })
       } else {
@@ -78,7 +83,7 @@ export function AppSidebar() {
       action: {
         icon: Plus,
         label: "New Thread",
-        onClick: () => createThreadMutation.mutate(),
+        onClick: () => setIsCreateDialogOpen(true),
         disabled: createThreadMutation.isPending,
       },
     },
@@ -89,18 +94,26 @@ export function AppSidebar() {
     : baseItems
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center">
-        <Logo variant="responsive" />
-      </SidebarHeader>
-      <SidebarContent>
-        <Main items={items} />
-      </SidebarContent>
-      <SidebarFooter>
-        <SidebarAppearance />
-        <User user={currentUser} />
-      </SidebarFooter>
-    </Sidebar>
+    <>
+      <Sidebar collapsible="icon">
+        <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center">
+          <Logo variant="responsive" />
+        </SidebarHeader>
+        <SidebarContent>
+          <Main items={items} />
+        </SidebarContent>
+        <SidebarFooter>
+          <SidebarAppearance />
+          <User user={currentUser} />
+        </SidebarFooter>
+      </Sidebar>
+      <CreateThreadDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        isSubmitting={createThreadMutation.isPending}
+        onConfirm={(title) => createThreadMutation.mutate(title)}
+      />
+    </>
   )
 }
 

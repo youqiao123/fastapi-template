@@ -2,8 +2,8 @@ thread_id 是 user-scoped 的
 任何 thread 的存在与访问都必须通过 user_id 解释。
 TODO: 在Agent服务端，对话线程还不是用户隔离的。也就是说，如果用户A知道了用户B的thread_id，如果A能把这个thread_id传给Agent服务端，它就能知道B的对话内容。
 
-docker compose rm -f db
-docker compose up -d db
+docker compose rm -f backend
+docker compose up -d backend
 
 docker exec -it fastapi-template-db-1 psql -U postgres -d app
 docker exec -it fastapi-template-db-1 psql -U agent_user -d app
