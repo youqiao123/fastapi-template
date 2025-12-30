@@ -14,6 +14,19 @@ export type ChatMessageStatus =
   | 'done'
   | 'error'
 
+export type AgentStepItem = {
+  id: string
+  name: string
+  status: "running" | "done"
+}
+
+export type AgentRunState = {
+  messageId: string
+  steps: AgentStepItem[]
+  elapsedSeconds: number
+  isActive: boolean
+}
+
 export interface ChatMessage {
   id: string
   role: ChatRole
@@ -24,19 +37,68 @@ export interface ChatMessage {
 
 export interface ChatPanelProps {
   messages: ChatMessage[]
+  agentRuns?: Record<string, AgentRunState>
   autoScroll?: boolean
   className?: string
 }
 
 const AUTO_SCROLL_THRESHOLD = 80
 
-function MessageItem({ message }: { message: ChatMessage }) {
+function AgentStepsPanel({
+  steps,
+  elapsedSeconds,
+}: {
+  steps: AgentStepItem[]
+  elapsedSeconds: number
+}) {
+  const activeIndex = steps.findIndex((step) => step.status === "running")
+  const currentStep =
+    activeIndex >= 0 ? activeIndex + 1 : Math.max(steps.length, 0)
+  const safeElapsed = Math.max(0, elapsedSeconds)
+
+  return (
+    <div className="rounded-md border border-border/50 bg-muted/40 px-3 py-2 text-xs">
+      <div className="text-xs font-semibold text-foreground">
+        {`Agent steps (${currentStep}) • ${safeElapsed}s`}
+      </div>
+      <div className="mt-2 space-y-1">
+        {steps.map((step, index) => (
+          <div className="flex items-start gap-2" key={step.id}>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <span
+              className={cn(
+                "text-xs leading-relaxed",
+                step.status === "done"
+                  ? "text-muted-foreground"
+                  : "text-foreground",
+              )}
+            >
+              {step.name}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MessageItem({
+  message,
+  agentRun,
+}: {
+  message: ChatMessage
+  agentRun?: AgentRunState
+}) {
   const isUser = message.role === "user"
   const isAssistant = message.role === "assistant"
   const isSystem = message.role === "system"
   const isPending = message.status === "pending"
   const isStreaming = message.status === "streaming"
   const isError = message.status === "error"
+  const showAgentSteps =
+    isAssistant && agentRun && agentRun.steps.length > 0
 
   const alignmentClass = isUser
     ? "justify-end"
@@ -70,10 +132,11 @@ function MessageItem({ message }: { message: ChatMessage }) {
   return (
     <div className={cn("flex w-full items-start", alignmentClass)}>
       <div className={bodyClass}>
-        {isAssistant && isStreaming ? (
-          <span className="inline-flex items-center">
-            <span className="size-2 animate-pulse rounded-full bg-foreground/50" />
-          </span>
+        {showAgentSteps ? (
+          <AgentStepsPanel
+            steps={agentRun.steps}
+            elapsedSeconds={agentRun.elapsedSeconds}
+          />
         ) : null}
         {content ? (
           isAssistant ? (
@@ -147,6 +210,7 @@ function MessageItem({ message }: { message: ChatMessage }) {
 
 export function ChatPanel({
   messages,
+  agentRuns,
   autoScroll = true,
   className,
 }: ChatPanelProps) {
@@ -229,7 +293,11 @@ export function ChatPanel({
           </div>
         ) : (
           messages.map((message) => (
-            <MessageItem key={message.id} message={message} />
+            <MessageItem
+              key={message.id}
+              message={message}
+              agentRun={agentRuns?.[message.id]}
+            />
           ))
         )}
         <div ref={bottomRef} />

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { CancelError } from "@/client"
-import { ChatPanel, type ChatMessage } from "@/components/Workspace/ChatPanel"
+import {
+  ChatPanel,
+  type AgentRunState,
+  type ChatMessage,
+} from "@/components/Workspace/ChatPanel"
 import ChatInput from "@/components/Workspace/ChatInput"
 import { apiBase } from "@/lib/api"
 import { listMessages, type MessageItem } from "@/lib/messages"
-import { getSSEText, readSSE } from "@/lib/sse"
+import { getSSEText, readSSE, type SSEMessage } from "@/lib/sse"
 
 const normalizeRole = (role: string): ChatMessage["role"] => {
   if (role === "user" || role === "assistant" || role === "system") {
@@ -32,6 +36,8 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
   const [status, setStatus] = useState("idle")
   const [error, setError] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [agentRuns, setAgentRuns] = useState<Record<string, AgentRunState>>({})
+  const [agentTimerStart, setAgentTimerStart] = useState<number | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
   const assistantMessageIdRef = useRef<string | null>(null)
   const historyRequestRef = useRef<ReturnType<typeof listMessages> | null>(null)
@@ -47,6 +53,139 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
         message.id === targetId ? { ...message, status: nextStatus } : message,
       ),
     )
+  }, [])
+
+  const safeParsePayload = (raw: string): Record<string, unknown> | null => {
+    if (!raw) {
+      return null
+    }
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      // ignore invalid JSON
+    }
+    return null
+  }
+
+  const getToolNameFromMessage = (message: SSEMessage): string | null => {
+    const payload = message.payload ?? safeParsePayload(message.data)
+    const tool = payload?.["tool"]
+    return typeof tool === "string" ? tool : null
+  }
+
+  const beginAgentRun = useCallback((messageId: string) => {
+    setAgentTimerStart(null)
+    setAgentRuns((prev) => ({
+      ...prev,
+      [messageId]: {
+        messageId,
+        steps: [],
+        elapsedSeconds: 0,
+        isActive: true,
+      },
+    }))
+  }, [])
+
+  const handleToolStart = useCallback(
+    (toolName: string) => {
+      const messageId = assistantMessageIdRef.current
+      if (!messageId) {
+        return
+      }
+
+      setAgentTimerStart((current) => current ?? Date.now())
+      setAgentRuns((prev) => {
+        const currentRun =
+          prev[messageId] ?? {
+            messageId,
+            steps: [],
+            elapsedSeconds: 0,
+            isActive: true,
+          }
+        return {
+          ...prev,
+          [messageId]: {
+            ...currentRun,
+            isActive: true,
+            steps: [
+              ...currentRun.steps,
+              {
+                id: `${Date.now()}-${currentRun.steps.length + 1}`,
+                name: toolName,
+                status: "running",
+              },
+            ],
+          },
+        }
+      })
+      setAssistantStatus("streaming")
+    },
+    [setAssistantStatus],
+  )
+
+  const handleToolEnd = useCallback((toolName: string | null) => {
+    const messageId = assistantMessageIdRef.current
+    if (!messageId) {
+      return
+    }
+    setAgentRuns((prev) => {
+      const currentRun = prev[messageId]
+      if (!currentRun || currentRun.steps.length === 0) {
+        return prev
+      }
+      const nextSteps = [...currentRun.steps]
+      for (let index = nextSteps.length - 1; index >= 0; index -= 1) {
+        const step = nextSteps[index]
+        const matches = !toolName || step.name === toolName
+        if (step.status === "running" && matches) {
+          nextSteps[index] = { ...step, status: "done" }
+          return {
+            ...prev,
+            [messageId]: { ...currentRun, steps: nextSteps },
+          }
+        }
+      }
+      return prev
+    })
+  }, [])
+
+  const updateElapsedForCurrentRun = useCallback(() => {
+    const messageId = assistantMessageIdRef.current
+    if (!messageId || agentTimerStart === null) {
+      return
+    }
+
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - agentTimerStart) / 1000),
+    )
+
+    setAgentRuns((prev) => {
+      const currentRun = prev[messageId]
+      if (!currentRun || currentRun.elapsedSeconds === elapsedSeconds) {
+        return prev
+      }
+      return {
+        ...prev,
+        [messageId]: { ...currentRun, elapsedSeconds },
+      }
+    })
+  }, [agentTimerStart])
+
+  const markAgentRunInactive = useCallback((messageId: string) => {
+    setAgentRuns((prev) => {
+      const currentRun = prev[messageId]
+      if (!currentRun) {
+        return prev
+      }
+      return {
+        ...prev,
+        [messageId]: { ...currentRun, isActive: false },
+      }
+    })
   }, [])
 
   const appendAssistantDelta = useCallback((delta: string) => {
@@ -81,6 +220,7 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
       const userMessageId = `user-${timestamp}`
       const assistantMessageId = `assistant-${timestamp}`
       assistantMessageIdRef.current = assistantMessageId
+      beginAgentRun(assistantMessageId)
 
       setMessages((prev) => [
         ...prev,
@@ -134,8 +274,24 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
           }
 
           if (message.event === "done") {
+            updateElapsedForCurrentRun()
             setStatus("done")
             setAssistantStatus("done")
+            markAgentRunInactive(assistantMessageId)
+            return
+          }
+
+          if (message.event === "on_tool_start") {
+            const toolName = getToolNameFromMessage(message)
+            if (toolName) {
+              handleToolStart(toolName)
+            }
+            return
+          }
+
+          if (message.event === "on_tool_end") {
+            const toolName = getToolNameFromMessage(message)
+            handleToolEnd(toolName)
             return
           }
 
@@ -155,17 +311,45 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
         }
       } finally {
         if (!controller.signal.aborted) {
+          updateElapsedForCurrentRun()
+          markAgentRunInactive(assistantMessageId)
           setIsStreaming(false)
           if (!didError) {
             setStatus("done")
             setAssistantStatus("done")
           }
         }
-        assistantMessageIdRef.current = null
+        if (assistantMessageIdRef.current === assistantMessageId) {
+          assistantMessageIdRef.current = null
+        }
       }
     },
-    [appendAssistantDelta, setAssistantStatus],
+    [
+      appendAssistantDelta,
+      beginAgentRun,
+      markAgentRunInactive,
+      handleToolEnd,
+      handleToolStart,
+      setAssistantStatus,
+      updateElapsedForCurrentRun,
+    ],
   )
+
+  useEffect(() => {
+    if (!isStreaming || agentTimerStart === null) {
+      return
+    }
+
+    updateElapsedForCurrentRun()
+    const timerId = window.setInterval(updateElapsedForCurrentRun, 1000)
+    return () => window.clearInterval(timerId)
+  }, [agentTimerStart, isStreaming, updateElapsedForCurrentRun])
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setAgentTimerStart(null)
+    }
+  }, [isStreaming])
 
   useEffect(() => {
     return () => controllerRef.current?.abort()
@@ -178,6 +362,8 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
     setStatus("idle")
     setError(null)
     setIsStreaming(false)
+    setAgentRuns({})
+    setAgentTimerStart(null)
   }, [activeThreadId])
 
   useEffect(() => {
@@ -229,8 +415,7 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
     void startStream(activeThreadId, message)
   }
 
-  const statusLabel =
-    status !== "idle" ? `Status: ${status}` : "Ready"
+  const statusLabel = status !== "idle" ? `Status: ${status}` : "Ready"
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-3 rounded-lg border bg-muted/20 p-4">
@@ -241,6 +426,7 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
       <div className="min-h-0 flex-1">
         <ChatPanel
           messages={messages}
+          agentRuns={agentRuns}
           className="rounded-md border border-dashed border-border/60 bg-background/40"
         />
       </div>
