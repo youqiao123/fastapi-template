@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -11,6 +12,8 @@ import { Button } from "@/components/ui/button"
 import { ArtifactPanel } from "@/components/Workspace/ArtifactPanel"
 import { ChatPanelContainer } from "@/components/Workspace/ChatPanelContainer"
 import { cn } from "@/lib/utils"
+import { listArtifacts } from "@/lib/artifacts"
+import { type ArtifactDisplay } from "@/types/artifact"
 
 type WorkspacePageProps = {
   threadId?: string
@@ -31,6 +34,7 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
   const [isArtifactsClosing, setIsArtifactsClosing] = useState(false)
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH)
   const [isDragging, setIsDragging] = useState(false)
+  const [artifacts, setArtifacts] = useState<ArtifactDisplay[]>([])
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chatWidthRef = useRef(chatWidth)
   const closeTimeoutRef = useRef<number | null>(null)
@@ -57,6 +61,47 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
   useEffect(() => {
     chatWidthRef.current = chatWidth
   }, [chatWidth])
+
+  const updateArtifacts = useCallback(
+    (incoming: ArtifactDisplay[], options?: { replace?: boolean }) => {
+      setArtifacts((prev) => {
+        const base = options?.replace ? [] : prev
+        const combined = [...base, ...incoming]
+        const seen = new Set<string>()
+        return combined.filter((artifact) => {
+          const key = `${artifact.assetId}-${artifact.path}`
+          if (seen.has(key)) {
+            return false
+          }
+          seen.add(key)
+          return true
+        })
+      })
+    },
+    [],
+  )
+
+  useEffect(() => {
+    updateArtifacts([], { replace: true })
+    if (!threadId) {
+      return
+    }
+
+    let isActive = true
+    listArtifacts({ threadId, limit: 50 })
+      .then((data) => {
+        if (isActive) {
+          updateArtifacts(data, { replace: true })
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load artifacts", err)
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [threadId, updateArtifacts])
 
   useEffect(() => {
     return () => {
@@ -227,16 +272,19 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
       >
         <div
           className={cn(
-            "order-1 w-full min-h-0 lg:flex lg:flex-col",
-            isDragging
-              ? "lg:transition-none"
-              : "transition-[width,max-width] duration-200 ease-linear",
-            isArtifactsOpen
-              ? "lg:flex-none lg:max-w-none lg:w-[var(--chat-width)] lg:min-w-[var(--chat-min-width)]"
-              : "lg:flex-1 lg:max-w-4xl lg:mx-auto",
-          )}
-        >
-          <ChatPanelContainer threadId={threadId} />
+          "order-1 w-full min-h-0 lg:flex lg:flex-col",
+          isDragging
+            ? "lg:transition-none"
+            : "transition-[width,max-width] duration-200 ease-linear",
+          isArtifactsOpen
+            ? "lg:flex-none lg:max-w-none lg:w-[var(--chat-width)] lg:min-w-[var(--chat-min-width)]"
+            : "lg:flex-1 lg:max-w-4xl lg:mx-auto",
+        )}
+          >
+          <ChatPanelContainer
+            threadId={threadId}
+            onArtifactsUpdate={updateArtifacts}
+          />
         </div>
         {isArtifactsVisible ? (
           <div
@@ -292,7 +340,7 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
                 : "pointer-events-none opacity-0 translate-x-3",
             )}
           >
-            <ArtifactPanel className="min-h-0 flex-1" />
+            <ArtifactPanel artifacts={artifacts} className="min-h-0 flex-1" />
           </div>
         </div>
       </div>

@@ -7,8 +7,10 @@ import {
 } from "@/components/Workspace/ChatPanel"
 import ChatInput from "@/components/Workspace/ChatInput"
 import { apiBase } from "@/lib/api"
+import { saveArtifacts } from "@/lib/artifacts"
 import { listMessages, type MessageItem } from "@/lib/messages"
 import { getSSEText, readSSE, type SSEMessage } from "@/lib/sse"
+import { type ArtifactDisplay, type ArtifactItem } from "@/types/artifact"
 
 const normalizeRole = (role: string): ChatMessage["role"] => {
   if (role === "user" || role === "assistant" || role === "system") {
@@ -25,11 +27,22 @@ const mapHistoryMessages = (items: MessageItem[], threadId: string) =>
     status: "done" as const,
   }))
 
-type ChatPanelContainerProps = {
-  threadId?: string
+type ArtifactUpdateOptions = {
+  replace?: boolean
 }
 
-export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
+type ChatPanelContainerProps = {
+  threadId?: string
+  onArtifactsUpdate?: (
+    artifacts: ArtifactDisplay[],
+    options?: ArtifactUpdateOptions,
+  ) => void
+}
+
+export function ChatPanelContainer({
+  threadId,
+  onArtifactsUpdate,
+}: ChatPanelContainerProps) {
   const activeThreadId = threadId
   const [draft, setDraft] = useState("")
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -41,6 +54,7 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
   const controllerRef = useRef<AbortController | null>(null)
   const assistantMessageIdRef = useRef<string | null>(null)
   const historyRequestRef = useRef<ReturnType<typeof listMessages> | null>(null)
+  const artifactKeysRef = useRef<Set<string>>(new Set())
 
   const setAssistantStatus = useCallback((nextStatus: ChatMessage["status"]) => {
     const targetId = assistantMessageIdRef.current
@@ -69,6 +83,86 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
     }
     return null
   }
+
+  const toArtifactItem = (value: unknown): ArtifactItem | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null
+    }
+    const candidate = value as Record<string, unknown>
+    const type = candidate["type"]
+    const path = candidate["path"]
+    const assetId = candidate["asset_id"]
+    const isFolder = candidate["is_folder"]
+
+    if (
+      typeof type !== "string" ||
+      typeof path !== "string" ||
+      typeof assetId !== "string"
+    ) {
+      return null
+    }
+
+    return {
+      type,
+      path,
+      assetId,
+      isFolder: typeof isFolder === "boolean" ? isFolder : false,
+    }
+  }
+
+  const parseArtifactsFromMessage = (message: SSEMessage): ArtifactItem[] => {
+    const payload = message.payload ?? safeParsePayload(message.data)
+    const artifactsValue = payload?.["artifacts"]
+    if (!Array.isArray(artifactsValue)) {
+      return []
+    }
+    return artifactsValue
+      .map(toArtifactItem)
+      .filter((item): item is ArtifactItem => Boolean(item))
+  }
+
+  const persistArtifacts = useCallback(
+    async (artifacts: ArtifactItem[]) => {
+      if (!artifacts.length || !activeThreadId) {
+        return []
+      }
+      try {
+        return await saveArtifacts(artifacts, activeThreadId)
+      } catch (err) {
+        console.error("Failed to persist artifacts", err)
+        return artifacts
+      }
+    },
+    [activeThreadId],
+  )
+
+  const registerArtifacts = useCallback(
+    async (artifacts: ArtifactItem[]) => {
+      if (!artifacts.length) {
+        return
+      }
+
+      const unique = artifacts.filter((artifact) => {
+        const key = `${artifact.assetId}-${artifact.path}`
+        if (artifactKeysRef.current.has(key)) {
+          return false
+        }
+        artifactKeysRef.current.add(key)
+        return true
+      })
+
+      if (!unique.length) {
+        return
+      }
+
+      onArtifactsUpdate?.(unique, { replace: false })
+      const saved = await persistArtifacts(unique)
+      if (saved.length) {
+        onArtifactsUpdate?.(saved, { replace: false })
+      }
+    },
+    [persistArtifacts, onArtifactsUpdate],
+  )
 
   const getToolNameFromMessage = (message: SSEMessage): string | null => {
     const payload = message.payload ?? safeParsePayload(message.data)
@@ -211,10 +305,12 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
       controllerRef.current?.abort()
       const controller = new AbortController()
       controllerRef.current = controller
+      artifactKeysRef.current = new Set()
 
       setIsStreaming(true)
       setStatus("connecting")
       setError(null)
+      onArtifactsUpdate?.([], { replace: true })
 
       const timestamp = Date.now()
       const userMessageId = `user-${timestamp}`
@@ -263,6 +359,11 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
         }
 
         await readSSE(response.body, (message) => {
+          const artifacts = parseArtifactsFromMessage(message)
+          if (artifacts.length) {
+            void registerArtifacts(artifacts)
+          }
+
           if (message.event === "status") {
             try {
               const payload = JSON.parse(message.data)
@@ -330,6 +431,8 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
       markAgentRunInactive,
       handleToolEnd,
       handleToolStart,
+      registerArtifacts,
+      onArtifactsUpdate,
       setAssistantStatus,
       updateElapsedForCurrentRun,
     ],
@@ -364,7 +467,9 @@ export function ChatPanelContainer({ threadId }: ChatPanelContainerProps) {
     setIsStreaming(false)
     setAgentRuns({})
     setAgentTimerStart(null)
-  }, [activeThreadId])
+    artifactKeysRef.current = new Set()
+    onArtifactsUpdate?.([], { replace: true })
+  }, [activeThreadId, onArtifactsUpdate])
 
   useEffect(() => {
     if (!activeThreadId) {

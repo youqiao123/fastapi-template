@@ -3,63 +3,66 @@ import { createFileRoute } from "@tanstack/react-router"
 import { Search } from "lucide-react"
 import { Suspense } from "react"
 
-import { ItemsService } from "@/client"
+import { artifactColumns } from "@/components/Artifacts/columns"
 import { DataTable } from "@/components/Common/DataTable"
-import AddItem from "@/components/Items/AddItem"
-import { columns } from "@/components/Items/columns"
 import PendingItems from "@/components/Pending/PendingItems"
+import { listArtifacts } from "@/lib/artifacts"
 
-function getItemsQueryOptions() {
+function getArtifactsQueryOptions() {
   return {
-    queryFn: () => ItemsService.readItems({ skip: 0, limit: 100 }),
-    queryKey: ["items"],
+    queryFn: () => listArtifacts({ limit: 200 }),
+    queryKey: ["artifacts"],
   }
 }
 
 export const Route = createFileRoute("/_layout/items")({
-  component: Items,
+  component: Artifacts,
   head: () => ({
     meta: [
       {
-        title: "Items - TPDagent Cloud",
+        title: "Artifacts",
       },
     ],
   }),
 })
 
-function ItemsTableContent() {
-  const { data: items } = useSuspenseQuery(getItemsQueryOptions())
+function ArtifactsTableContent() {
+  const { data: artifacts } = useSuspenseQuery(getArtifactsQueryOptions())
 
-  if (items.data.length === 0) {
+  if (!artifacts.length) {
     return (
       <div className="flex flex-col items-center justify-center text-center py-12">
         <div className="rounded-full bg-muted p-4 mb-4">
           <Search className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-semibold">You don't have any items yet</h3>
-        <p className="text-muted-foreground">Add a new item to get started</p>
+        <h3 className="text-lg font-semibold">No artifacts yet</h3>
+        <p className="text-muted-foreground">
+          Run an agent and check back here.
+        </p>
       </div>
     )
   }
 
-  return <DataTable columns={columns} data={items.data} />
+  return <DataTable columns={artifactColumns} data={artifacts} />
 }
 
-function ItemsTable() {
+function ArtifactsTable() {
   return (
     <Suspense fallback={<PendingItems />}>
-      <ItemsTableContent />
+      <ArtifactsTableContent />
     </Suspense>
   )
 }
 
-function Items() {
+function Artifacts() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-end">
-        <AddItem />
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-muted-foreground">
+          Artifacts
+        </h2>
       </div>
-      <ItemsTable />
+      <ArtifactsTable />
     </div>
   )
 }

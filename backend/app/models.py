@@ -55,6 +55,9 @@ class User(UserBase, table=True):
     conversation_threads: list["ConversationThread"] = Relationship(
         back_populates="user", cascade_delete=True
     )
+    artifacts: list["Artifact"] = Relationship(
+        back_populates="user", cascade_delete=True
+    )
 
 
 # Properties to return via API, id is always required
@@ -100,6 +103,42 @@ class ItemPublic(ItemBase):
 
 class ItemsPublic(SQLModel):
     data: list[ItemPublic]
+    count: int
+
+
+class ArtifactBase(SQLModel):
+    type: str = Field(max_length=255)
+    path: str = Field(max_length=255)
+    asset_id: str = Field(max_length=255, alias="asset_id")
+    is_folder: bool = Field(default=False, alias="is_folder")
+    thread_id: str = Field(max_length=26)
+
+    model_config = SQLModel.model_config | ConfigDict(populate_by_name=True)
+
+
+class ArtifactCreate(ArtifactBase):
+    pass
+
+
+class Artifact(ArtifactBase, table=True):
+    __tablename__ = "artifact"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    user: User | None = Relationship(back_populates="artifacts")
+
+
+class ArtifactPublic(ArtifactBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+
+
+class ArtifactsPublic(SQLModel):
+    data: list[ArtifactPublic]
     count: int
 
 

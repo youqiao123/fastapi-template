@@ -20,8 +20,8 @@ from app.models import (
 )
 
 router = APIRouter(tags=["chat"])
-AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", None)
-# AGENT_BASE_URL = "http://localhost:9001"  # for local testing
+# AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", None) # for deployment
+AGENT_BASE_URL = "http://localhost:9001"  # for local testing
 if not AGENT_BASE_URL:
     raise RuntimeError("AGENT_BASE_URL is not set")
 

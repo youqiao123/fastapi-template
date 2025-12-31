@@ -13,8 +13,6 @@ services:
       - app-db-data:/var/lib/postgresql/data/pgdata
     env_file:
       - .env
-    # ports:     # python进程如果不在docker-compose下，需要用localhost:port
-    #   - "5432:5432"
     environment:
       - PGDATA=/var/lib/postgresql/data/pgdata
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
@@ -82,8 +80,6 @@ services:
     restart: always
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      # Force an IPv4-only host alias for reaching services running on the Docker host.
-      # - "dockerhost:host-gateway"
     networks:
       - traefik-public
       - default
@@ -113,6 +109,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - SENTRY_DSN=${SENTRY_DSN}
+    volumes:
+      - ${SHARED_ROOT}:/data
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
