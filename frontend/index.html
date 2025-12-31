@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/assets/images/agent-favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/vendor/chemdoodle/ChemDoodleWeb.css" />
+    <script src="/vendor/chemdoodle/ChemDoodleWeb.js"></script>
+    <script>
+      // Bridge the global lexical binding to window for libraries that use top-level let.
+      if (typeof ChemDoodle !== "undefined" && !window.ChemDoodle) {
+        window.ChemDoodle = ChemDoodle
+      }
+    </script>
+    <script src="/vendor/chemdoodle/ChemDoodleWeb-uis.js"></script>
     <title>Full Stack TPDagent Project</title>
   </head>
   <body>
