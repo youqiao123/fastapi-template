@@ -77,7 +77,7 @@ export function AppSidebar() {
 
   const baseItems: Item[] = [
     { icon: Home, title: "Dashboard", path: "/" },
-    { icon: Briefcase, title: "Items", path: "/items" },
+    { icon: Briefcase, title: "Artifact", path: "/artifact" },
     {
       icon: LayoutGrid,
       title: "Workspace",

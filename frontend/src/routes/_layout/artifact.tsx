@@ -5,7 +5,7 @@ import { Suspense } from "react"
 
 import { artifactColumns } from "@/components/Artifacts/columns"
 import { DataTable } from "@/components/Common/DataTable"
-import PendingItems from "@/components/Pending/PendingItems"
+import PendingArtifacts from "@/components/Pending/PendingArtifacts"
 import { listArtifacts } from "@/lib/artifacts"
 
 function getArtifactsQueryOptions() {
@@ -15,12 +15,12 @@ function getArtifactsQueryOptions() {
   }
 }
 
-export const Route = createFileRoute("/_layout/items")({
+export const Route = createFileRoute("/_layout/artifact")({
   component: Artifacts,
   head: () => ({
     meta: [
       {
-        title: "Artifacts",
+        title: "Artifact",
       },
     ],
   }),
@@ -48,7 +48,7 @@ function ArtifactsTableContent() {
 
 function ArtifactsTable() {
   return (
-    <Suspense fallback={<PendingItems />}>
+    <Suspense fallback={<PendingArtifacts />}>
       <ArtifactsTableContent />
     </Suspense>
   )
@@ -57,11 +57,6 @@ function ArtifactsTable() {
 function Artifacts() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-muted-foreground">
-          Artifacts
-        </h2>
-      </div>
       <ArtifactsTable />
     </div>
   )

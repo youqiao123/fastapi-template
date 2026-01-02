@@ -18,7 +18,7 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutWorkspaceRouteImport } from './routes/_layout/workspace'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
-import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
+import { Route as LayoutArtifactRouteImport } from './routes/_layout/artifact'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutWorkspaceIndexRouteImport } from './routes/_layout/workspace.index'
 import { Route as LayoutWorkspaceThreadIdRouteImport } from './routes/_layout/workspace.$threadId'
@@ -67,9 +67,9 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutItemsRoute = LayoutItemsRouteImport.update({
-  id: '/items',
-  path: '/items',
+const LayoutArtifactRoute = LayoutArtifactRouteImport.update({
+  id: '/artifact',
+  path: '/artifact',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAdminRoute = LayoutAdminRouteImport.update({
@@ -95,7 +95,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/admin': typeof LayoutAdminRoute
-  '/items': typeof LayoutItemsRoute
+  '/artifact': typeof LayoutArtifactRoute
   '/settings': typeof LayoutSettingsRoute
   '/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/': typeof LayoutIndexRoute
@@ -109,7 +109,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/admin': typeof LayoutAdminRoute
-  '/items': typeof LayoutItemsRoute
+  '/artifact': typeof LayoutArtifactRoute
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
   '/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
@@ -124,7 +124,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/_layout/admin': typeof LayoutAdminRoute
-  '/_layout/items': typeof LayoutItemsRoute
+  '/_layout/artifact': typeof LayoutArtifactRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/_layout/': typeof LayoutIndexRoute
@@ -140,7 +140,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-email'
     | '/admin'
-    | '/items'
+    | '/artifact'
     | '/settings'
     | '/workspace'
     | '/'
@@ -154,7 +154,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-email'
     | '/admin'
-    | '/items'
+    | '/artifact'
     | '/settings'
     | '/'
     | '/workspace/$threadId'
@@ -168,7 +168,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/verify-email'
     | '/_layout/admin'
-    | '/_layout/items'
+    | '/_layout/artifact'
     | '/_layout/settings'
     | '/_layout/workspace'
     | '/_layout/'
@@ -250,11 +250,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSettingsRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/items': {
-      id: '/_layout/items'
-      path: '/items'
-      fullPath: '/items'
-      preLoaderRoute: typeof LayoutItemsRouteImport
+    '/_layout/artifact': {
+      id: '/_layout/artifact'
+      path: '/artifact'
+      fullPath: '/artifact'
+      preLoaderRoute: typeof LayoutArtifactRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/admin': {
@@ -297,7 +297,7 @@ const LayoutWorkspaceRouteWithChildren = LayoutWorkspaceRoute._addFileChildren(
 
 interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
-  LayoutItemsRoute: typeof LayoutItemsRoute
+  LayoutArtifactRoute: typeof LayoutArtifactRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutWorkspaceRoute: typeof LayoutWorkspaceRouteWithChildren
   LayoutIndexRoute: typeof LayoutIndexRoute
@@ -305,7 +305,7 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
-  LayoutItemsRoute: LayoutItemsRoute,
+  LayoutArtifactRoute: LayoutArtifactRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutWorkspaceRoute: LayoutWorkspaceRouteWithChildren,
   LayoutIndexRoute: LayoutIndexRoute,
