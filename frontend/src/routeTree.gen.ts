@@ -17,6 +17,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutWorkspaceRouteImport } from './routes/_layout/workspace'
+import { Route as LayoutSmilesViewerRouteImport } from './routes/_layout/smiles-viewer'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutItemsRouteImport } from './routes/_layout/items'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
@@ -62,6 +63,11 @@ const LayoutWorkspaceRoute = LayoutWorkspaceRouteImport.update({
   path: '/workspace',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutSmilesViewerRoute = LayoutSmilesViewerRouteImport.update({
+  id: '/smiles-viewer',
+  path: '/smiles-viewer',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof LayoutAdminRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/smiles-viewer': typeof LayoutSmilesViewerRoute
   '/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/': typeof LayoutIndexRoute
   '/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminRoute
   '/items': typeof LayoutItemsRoute
   '/settings': typeof LayoutSettingsRoute
+  '/smiles-viewer': typeof LayoutSmilesViewerRoute
   '/': typeof LayoutIndexRoute
   '/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
   '/workspace': typeof LayoutWorkspaceIndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/items': typeof LayoutItemsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
+  '/_layout/smiles-viewer': typeof LayoutSmilesViewerRoute
   '/_layout/workspace': typeof LayoutWorkspaceRouteWithChildren
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/workspace/$threadId': typeof LayoutWorkspaceThreadIdRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/items'
     | '/settings'
+    | '/smiles-viewer'
     | '/workspace'
     | '/'
     | '/workspace/$threadId'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/items'
     | '/settings'
+    | '/smiles-viewer'
     | '/'
     | '/workspace/$threadId'
     | '/workspace'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/_layout/admin'
     | '/_layout/items'
     | '/_layout/settings'
+    | '/_layout/smiles-viewer'
     | '/_layout/workspace'
     | '/_layout/'
     | '/_layout/workspace/$threadId'
@@ -243,6 +255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutWorkspaceRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/smiles-viewer': {
+      id: '/_layout/smiles-viewer'
+      path: '/smiles-viewer'
+      fullPath: '/smiles-viewer'
+      preLoaderRoute: typeof LayoutSmilesViewerRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/settings': {
       id: '/_layout/settings'
       path: '/settings'
@@ -299,6 +318,7 @@ interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutItemsRoute: typeof LayoutItemsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
+  LayoutSmilesViewerRoute: typeof LayoutSmilesViewerRoute
   LayoutWorkspaceRoute: typeof LayoutWorkspaceRouteWithChildren
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
@@ -307,6 +327,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutItemsRoute: LayoutItemsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
+  LayoutSmilesViewerRoute: LayoutSmilesViewerRoute,
   LayoutWorkspaceRoute: LayoutWorkspaceRouteWithChildren,
   LayoutIndexRoute: LayoutIndexRoute,
 }
@@ -316,7 +337,6 @@ const LayoutRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
-  ChemdoodleDemoRoute: ChemdoodleDemoRoute,
   LoginRoute: LoginRoute,
   RecoverPasswordRoute: RecoverPasswordRoute,
   ResetPasswordRoute: ResetPasswordRoute,
