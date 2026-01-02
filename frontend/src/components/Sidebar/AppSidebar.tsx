@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Briefcase,
-  FlaskConical,
   Home,
   LayoutGrid,
   Plus,
@@ -79,7 +78,6 @@ export function AppSidebar() {
   const baseItems: Item[] = [
     { icon: Home, title: "Dashboard", path: "/" },
     { icon: Briefcase, title: "Items", path: "/items" },
-    { icon: FlaskConical, title: "SMILES Viewer", path: "/smiles-viewer" },
     {
       icon: LayoutGrid,
       title: "Workspace",
