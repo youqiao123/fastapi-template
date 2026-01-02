@@ -108,3 +108,73 @@ export const listArtifacts = async (
   const data: ArtifactApiResponse = await response.json()
   return data.data.map(toDisplayArtifact)
 }
+
+export const deleteArtifact = async (artifactId: string): Promise<void> => {
+  const response = await fetch(`${apiBase}/api/v1/artifacts/${artifactId}`, {
+    method: "DELETE",
+    headers: {
+      ...(authHeaders() ?? {}),
+    },
+  })
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || "Failed to delete artifact")
+  }
+}
+
+const getFileName = (path: string, fallback: string) => {
+  const parts = path.split("/").filter(Boolean)
+  const name = parts[parts.length - 1]
+  return name || fallback
+}
+
+export const downloadArtifact = async (
+  artifact: Pick<ArtifactRecord, "id" | "path">,
+): Promise<void> => {
+  const response = await fetch(
+    `${apiBase}/api/v1/artifacts/${artifact.id}/download`,
+    {
+      headers: {
+        ...(authHeaders() ?? {}),
+      },
+    },
+  )
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || "Failed to download artifact")
+  }
+
+  const blob = await response.blob()
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = getFileName(artifact.path, `artifact-${artifact.id}`)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
+}
+
+export const fetchArtifactText = async (
+  artifact: Pick<ArtifactRecord, "id" | "path">,
+  options?: { signal?: AbortSignal },
+): Promise<string> => {
+  const response = await fetch(
+    `${apiBase}/api/v1/artifacts/${artifact.id}/download`,
+    {
+      headers: {
+        ...(authHeaders() ?? {}),
+      },
+      signal: options?.signal,
+    },
+  )
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || "Failed to load artifact")
+  }
+
+  return response.text()
+}

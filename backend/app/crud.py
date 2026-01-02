@@ -1,10 +1,24 @@
+import logging
 import uuid
+from pathlib import Path
 from typing import Any
 
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
 from app.models import Item, ItemCreate, User, UserCreate, UserUpdate
+
+logger = logging.getLogger(__name__)
+
+
+def _ensure_user_storage(user_id: uuid.UUID) -> None:
+    if not settings.ARTIFACTS_STORAGE_DIR:
+        return
+    root = Path(settings.ARTIFACTS_STORAGE_DIR).resolve()
+    target = root / str(user_id)
+    target.mkdir(parents=True, exist_ok=True)
+    logger.info("Ensured artifact directory for user %s at %s", user_id, target)
 
 
 def create_user(
@@ -20,6 +34,7 @@ def create_user(
     session.add(db_obj)
     session.commit()
     session.refresh(db_obj)
+    _ensure_user_storage(db_obj.id)
     return db_obj
 
 
