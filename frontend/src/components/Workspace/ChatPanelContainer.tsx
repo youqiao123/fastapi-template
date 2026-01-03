@@ -37,11 +37,13 @@ type ChatPanelContainerProps = {
     artifacts: ArtifactDisplay[],
     options?: ArtifactUpdateOptions,
   ) => void
+  onArtifactsView?: (artifacts: ArtifactDisplay[]) => void
 }
 
 export function ChatPanelContainer({
   threadId,
   onArtifactsUpdate,
+  onArtifactsView,
 }: ChatPanelContainerProps) {
   const activeThreadId = threadId
   const [draft, setDraft] = useState("")
@@ -136,14 +138,63 @@ export function ChatPanelContainer({
     [activeThreadId],
   )
 
+  const getArtifactKey = useCallback(
+    (artifact: Pick<ArtifactItem, "assetId" | "path">) =>
+      `${artifact.assetId}-${artifact.path}`,
+    [],
+  )
+
+  const mergeArtifactsByKey = useCallback(
+    (current: ArtifactDisplay[] = [], incoming: ArtifactDisplay[]) => {
+      const merged = [...incoming, ...current]
+      const seen = new Set<string>()
+      const unique: ArtifactDisplay[] = []
+
+      for (const artifact of merged) {
+        const key = getArtifactKey(artifact)
+        if (seen.has(key)) {
+          continue
+        }
+        seen.add(key)
+        unique.push(artifact)
+      }
+
+      return unique
+    },
+    [getArtifactKey],
+  )
+
+  const attachArtifactsToMessage = useCallback(
+    (messageId: string | null, artifacts: ArtifactDisplay[]) => {
+      if (!messageId || !artifacts.length) {
+        return
+      }
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                artifacts: mergeArtifactsByKey(message.artifacts, artifacts),
+              }
+            : message,
+        ),
+      )
+    },
+    [mergeArtifactsByKey],
+  )
+
   const registerArtifacts = useCallback(
-    async (artifacts: ArtifactItem[]) => {
+    async (
+      artifacts: ArtifactItem[],
+      options?: { messageId?: string },
+    ) => {
       if (!artifacts.length) {
         return
       }
 
       const unique = artifacts.filter((artifact) => {
-        const key = `${artifact.assetId}-${artifact.path}`
+        const key = getArtifactKey(artifact)
         if (artifactKeysRef.current.has(key)) {
           return false
         }
@@ -156,12 +207,14 @@ export function ChatPanelContainer({
       }
 
       onArtifactsUpdate?.(unique, { replace: false })
+      attachArtifactsToMessage(options?.messageId ?? null, unique)
       const saved = await persistArtifacts(unique)
       if (saved.length) {
         onArtifactsUpdate?.(saved, { replace: false })
+        attachArtifactsToMessage(options?.messageId ?? null, saved)
       }
     },
-    [persistArtifacts, onArtifactsUpdate],
+    [attachArtifactsToMessage, getArtifactKey, persistArtifacts, onArtifactsUpdate],
   )
 
   const getToolNameFromMessage = (message: SSEMessage): string | null => {
@@ -361,7 +414,10 @@ export function ChatPanelContainer({
         await readSSE(response.body, (message) => {
           const artifacts = parseArtifactsFromMessage(message)
           if (artifacts.length) {
-            void registerArtifacts(artifacts)
+            const shouldAttachToMessage = message.event === "done"
+            void registerArtifacts(artifacts, {
+              messageId: shouldAttachToMessage ? assistantMessageId : undefined,
+            })
           }
 
           if (message.event === "status") {
@@ -533,6 +589,7 @@ export function ChatPanelContainer({
           messages={messages}
           agentRuns={agentRuns}
           className="rounded-md border border-dashed border-border/60 bg-background/40"
+          onShowArtifacts={onArtifactsView}
         />
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

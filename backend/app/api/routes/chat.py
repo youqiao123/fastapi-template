@@ -80,7 +80,8 @@ async def chat_stream(
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
                 "POST",
-                f"{AGENT_BASE_URL}/agent/chat",
+                # f"{AGENT_BASE_URL}/agent/chat",
+                f"{AGENT_BASE_URL}/agent/fake-chat", # for testing
                 json=payload,
             ) as resp:
                 resp.raise_for_status()

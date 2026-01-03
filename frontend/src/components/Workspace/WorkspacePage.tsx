@@ -35,6 +35,9 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH)
   const [isDragging, setIsDragging] = useState(false)
   const [artifacts, setArtifacts] = useState<ArtifactDisplay[]>([])
+  const [activeArtifact, setActiveArtifact] = useState<ArtifactDisplay | null>(
+    null,
+  )
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chatWidthRef = useRef(chatWidth)
   const closeTimeoutRef = useRef<number | null>(null)
@@ -58,6 +61,11 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
       } as CSSProperties)
     : undefined
 
+  const getArtifactKey = useCallback(
+    (artifact: ArtifactDisplay) => `${artifact.assetId}-${artifact.path}`,
+    [],
+  )
+
   useEffect(() => {
     chatWidthRef.current = chatWidth
   }, [chatWidth])
@@ -66,19 +74,23 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
     (incoming: ArtifactDisplay[], options?: { replace?: boolean }) => {
       setArtifacts((prev) => {
         const base = options?.replace ? [] : prev
-        const combined = [...base, ...incoming]
+        const merged = [...incoming, ...base]
         const seen = new Set<string>()
-        return combined.filter((artifact) => {
-          const key = `${artifact.assetId}-${artifact.path}`
+        const unique: ArtifactDisplay[] = []
+
+        for (const artifact of merged) {
+          const key = getArtifactKey(artifact)
           if (seen.has(key)) {
-            return false
+            continue
           }
           seen.add(key)
-          return true
-        })
+          unique.push(artifact)
+        }
+
+        return unique
       })
     },
-    [],
+    [getArtifactKey],
   )
 
   useEffect(() => {
@@ -102,6 +114,24 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
       isActive = false
     }
   }, [threadId, updateArtifacts])
+
+  useEffect(() => {
+    setActiveArtifact((current) => {
+      if (!artifacts.length) {
+        return null
+      }
+
+      if (!current) {
+        return artifacts[0]
+      }
+
+      const key = getArtifactKey(current)
+      const replacement = artifacts.find(
+        (artifact) => getArtifactKey(artifact) === key,
+      )
+      return replacement ?? artifacts[0]
+    })
+  }, [artifacts, getArtifactKey])
 
   useEffect(() => {
     return () => {
@@ -185,6 +215,24 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
       setChatWidth(lastOpenChatWidthRef.current)
       closeTimeoutRef.current = null
     }, CLOSE_ANIMATION_MS)
+  }
+
+  const handleArtifactsView = (incoming: ArtifactDisplay[]) => {
+    if (!incoming.length) {
+      return
+    }
+
+    openArtifacts()
+
+    setActiveArtifact(() => {
+      const target = incoming[0]
+      const targetKey = getArtifactKey(target)
+      const existing =
+        artifacts.find(
+          (artifact) => getArtifactKey(artifact) === targetKey,
+        ) ?? null
+      return existing ?? target
+    })
   }
 
   const handleToggleArtifacts = () => {
@@ -272,18 +320,19 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
       >
         <div
           className={cn(
-          "order-1 w-full min-h-0 lg:flex lg:flex-col",
-          isDragging
-            ? "lg:transition-none"
-            : "transition-[width,max-width] duration-200 ease-linear",
-          isArtifactsOpen
-            ? "lg:flex-none lg:max-w-none lg:w-[var(--chat-width)] lg:min-w-[var(--chat-min-width)]"
-            : "lg:flex-1 lg:max-w-4xl lg:mx-auto",
-        )}
-          >
+            "order-1 w-full min-h-0 lg:flex lg:flex-col",
+            isDragging
+              ? "lg:transition-none"
+              : "transition-[width,max-width] duration-200 ease-linear",
+            isArtifactsOpen
+              ? "lg:flex-none lg:max-w-none lg:w-[var(--chat-width)] lg:min-w-[var(--chat-min-width)]"
+              : "lg:flex-1 lg:max-w-4xl lg:mx-auto",
+          )}
+        >
           <ChatPanelContainer
             threadId={threadId}
             onArtifactsUpdate={updateArtifacts}
+            onArtifactsView={handleArtifactsView}
           />
         </div>
         {isArtifactsVisible ? (
@@ -317,9 +366,21 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
           <div
             className={cn(
               "flex items-center",
-              isArtifactsOpen ? "justify-end" : "justify-center",
+              isArtifactsExpanded ? "justify-between gap-3" : "justify-center",
             )}
           >
+            {isArtifactsExpanded ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <h2 className="text-sm font-semibold text-muted-foreground">
+                  Artifacts
+                </h2>
+                {artifacts.length ? (
+                  <span className="text-xs text-muted-foreground">
+                    {artifacts.length} found
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             <Button
               type="button"
               variant={isArtifactsExpanded ? "secondary" : "ghost"}
@@ -340,7 +401,12 @@ export function WorkspacePage({ threadId }: WorkspacePageProps) {
                 : "pointer-events-none opacity-0 translate-x-3",
             )}
           >
-            <ArtifactPanel artifacts={artifacts} className="min-h-0 flex-1" />
+            <ArtifactPanel
+              artifacts={artifacts}
+              activeArtifact={activeArtifact}
+              onArtifactSelect={(artifact) => setActiveArtifact(artifact)}
+              className="min-h-0 flex-1"
+            />
           </div>
         </div>
       </div>

@@ -6,6 +6,12 @@ import { useEffect, useState } from "react"
 import { RdkitSmilesViewer } from "@/components/ChemicalViewer/RdkitSmilesViewer"
 import { MolstarViewer } from "@/components/ProteinViewer/MolstarViewer"
 import { type ArtifactRecord } from "@/types/artifact"
+import {
+  getPreviewMode,
+  getStructureFormat,
+  parseSmilesFromCsv,
+  type PreviewMode,
+} from "@/lib/artifactPreview"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,86 +33,6 @@ import {
 } from "@/lib/artifacts"
 
 type PreviewStatus = "idle" | "loading" | "ready" | "error"
-type PreviewMode = "smiles" | "structure" | "unsupported"
-
-const isLinkerDesignCsv = (artifact: ArtifactRecord) =>
-  artifact.type === "linker_design_output" &&
-  artifact.path.toLowerCase().endsWith(".csv") &&
-  !artifact.isFolder
-
-const isTernaryStructure = (artifact: ArtifactRecord) =>
-  artifact.type === "ternary_complex_structure" &&
-  !artifact.isFolder &&
-  (artifact.path.toLowerCase().endsWith(".pdb") ||
-    artifact.path.toLowerCase().endsWith(".cif"))
-
-const getStructureFormat = (
-  path: string,
-): "pdb" | "cif" => (path.toLowerCase().endsWith(".cif") ? "cif" : "pdb")
-
-const getPreviewMode = (artifact: ArtifactRecord): PreviewMode => {
-  if (isLinkerDesignCsv(artifact)) return "smiles"
-  if (isTernaryStructure(artifact)) return "structure"
-  return "unsupported"
-}
-
-const splitCsvLine = (rawLine: string): string[] => {
-  const line = rawLine.replace(/\r$/, "")
-  const cells: string[] = []
-  let current = ""
-  let inQuotes = false
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (char === '"') {
-      const next = line[i + 1]
-      if (inQuotes && next === '"') {
-        current += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-      continue
-    }
-    if (char === "," && !inQuotes) {
-      cells.push(current)
-      current = ""
-      continue
-    }
-    current += char
-  }
-
-  cells.push(current)
-  return cells
-}
-
-const normalizeCell = (cell: string) => cell.trim().replace(/^"|"$/g, "")
-
-const parseSmilesFromCsv = (csvText: string): string[] => {
-  const lines = csvText
-    .split(/\r?\n/)
-    .map((line) => line.trimEnd())
-    .filter((line) => line.length > 0)
-
-  if (!lines.length) return []
-
-  const headers = splitCsvLine(lines[0]).map((cell) =>
-    normalizeCell(cell).toLowerCase(),
-  )
-  const smilesIndex = headers.findIndex((header) => header === "smiles")
-  if (smilesIndex === -1) return []
-
-  const smiles: string[] = []
-  for (const rawLine of lines.slice(1)) {
-    const cells = splitCsvLine(rawLine)
-    const value = normalizeCell(cells[smilesIndex] ?? "")
-    if (value) {
-      smiles.push(value)
-    }
-  }
-
-  return smiles
-}
 
 const formatDate = (value?: string) => {
   if (!value) return ""

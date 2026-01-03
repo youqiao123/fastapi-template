@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, PanelRightOpen } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
+import { type ArtifactDisplay } from "@/types/artifact"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -33,6 +34,7 @@ export interface ChatMessage {
   content: string
   status?: ChatMessageStatus
   createdAt?: number
+  artifacts?: ArtifactDisplay[]
 }
 
 export interface ChatPanelProps {
@@ -40,6 +42,7 @@ export interface ChatPanelProps {
   agentRuns?: Record<string, AgentRunState>
   autoScroll?: boolean
   className?: string
+  onShowArtifacts?: (artifacts: ArtifactDisplay[]) => void
 }
 
 const AUTO_SCROLL_THRESHOLD = 80
@@ -87,18 +90,25 @@ function AgentStepsPanel({
 function MessageItem({
   message,
   agentRun,
+  onShowArtifacts,
 }: {
   message: ChatMessage
   agentRun?: AgentRunState
+  onShowArtifacts?: (artifacts: ArtifactDisplay[]) => void
 }) {
   const isUser = message.role === "user"
   const isAssistant = message.role === "assistant"
   const isSystem = message.role === "system"
   const isPending = message.status === "pending"
-  const isStreaming = message.status === "streaming"
   const isError = message.status === "error"
   const showAgentSteps =
     isAssistant && agentRun && agentRun.steps.length > 0
+  const artifacts = message.artifacts ?? []
+  const hasArtifactsButton =
+    isAssistant &&
+    message.status === "done" &&
+    artifacts.length > 0 &&
+    Boolean(onShowArtifacts)
 
   const alignmentClass = isUser
     ? "justify-end"
@@ -203,6 +213,21 @@ function MessageItem({
             Generation failed.
           </div>
         ) : null}
+        {hasArtifactsButton ? (
+          <div className="flex items-center pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              aria-label="Open artifacts panel"
+              title="Open artifacts panel"
+              onClick={() => onShowArtifacts?.(artifacts)}
+            >
+              <PanelRightOpen className="size-4" />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -213,6 +238,7 @@ export function ChatPanel({
   agentRuns,
   autoScroll = true,
   className,
+  onShowArtifacts,
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -297,6 +323,7 @@ export function ChatPanel({
               key={message.id}
               message={message}
               agentRun={agentRuns?.[message.id]}
+              onShowArtifacts={onShowArtifacts}
             />
           ))
         )}
