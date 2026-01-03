@@ -1,17 +1,21 @@
-import initRDKitModule, { type RDKitModule } from "@rdkit/rdkit"
+import initRDKitModule, {
+  type RDKitLoader,
+  type RDKitModule,
+} from "@rdkit/rdkit"
 import rdkitWasmUrl from "@rdkit/rdkit/Code/MinimalLib/dist/RDKit_minimal.wasm?url"
 
-let loadPromise: Promise<RDKitModule> | null = null
+const loadRDKitModule = initRDKitModule as unknown as RDKitLoader
+let loadPromise: Promise<RDKitModule> | undefined
 
 /**
  * Ensure the RDKit WebAssembly module is loaded once and reused.
  */
-export const ensureRDKit = async () => {
+export const ensureRDKit = async (): Promise<RDKitModule> => {
   if (!loadPromise) {
-    loadPromise = initRDKitModule({
+    loadPromise = loadRDKitModule({
       locateFile: () => rdkitWasmUrl,
-    }).catch((err) => {
-      loadPromise = null
+    }).catch((err: unknown) => {
+      loadPromise = undefined
       throw err
     })
   }

@@ -47,7 +47,7 @@ export function MolstarViewer({
       if (cancelled) return
 
       const formatId = format === "cif" ? "mmcif" : "pdb"
-      const trajectory = await plugin.builders.structure.parseTrajectoryData(
+      const trajectory = await plugin.builders.structure.parseTrajectory(
         dataCell,
         formatId,
       )

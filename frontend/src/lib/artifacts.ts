@@ -2,7 +2,6 @@ import { apiBase } from "@/lib/api"
 import {
   type ArtifactItem,
   type ArtifactRecord,
-  type ArtifactDisplay,
 } from "@/types/artifact"
 
 type ArtifactApiResponse = {
