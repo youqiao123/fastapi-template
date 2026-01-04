@@ -20,8 +20,8 @@ from app.models import (
 )
 
 router = APIRouter(tags=["chat"])
-AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", None) # for deployment
-# AGENT_BASE_URL = "http://localhost:9001"  # for local testing
+# AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", None) # for deployment
+AGENT_BASE_URL = "http://localhost:9001"  # for local testing
 if not AGENT_BASE_URL:
     raise RuntimeError("AGENT_BASE_URL is not set")
 
@@ -80,8 +80,8 @@ async def chat_stream(
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
                 "POST",
-                # f"{AGENT_BASE_URL}/agent/chat",
-                f"{AGENT_BASE_URL}/agent/fake-chat", # for testing
+                f"{AGENT_BASE_URL}/agent/chat",
+                # f"{AGENT_BASE_URL}/agent/fake-chat", # for testing
                 json=payload,
             ) as resp:
                 resp.raise_for_status()
