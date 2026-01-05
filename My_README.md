@@ -16,7 +16,7 @@ docker compose build --no-cache frontend && docker compose up -d frontend
 cd backend && uvicorn app.main:app --port 9000
 cd frontend && npm run dev 
 
-http://YOUR_SERVER_IP:8081
+http://47.99.82.91:8081
 ## 在db容器里创建agent schema
 
 目标只有一个：
