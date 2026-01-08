@@ -107,7 +107,7 @@ services:
     image: '${DOCKER_IMAGE_FRONTEND?Variable not set}:${TAG-latest}'
     restart: always
     ports:
-      - "5905:80" # 【关键】前端映射到宿主机的 5095 端口
+      - "5905:80" # 【关键】前端映射到宿主机的 5905 端口
     build:
       context: ./frontend
       args:
