@@ -21,8 +21,8 @@
 - 📫 Email based password recovery.
 - 📬 [Mailcatcher](https://mailcatcher.me) for local email testing during development.
 - ✅ Tests with [Pytest](https://pytest.org).
-- 📞 [Traefik](https://traefik.io) as a reverse proxy / load balancer.
-- 🚢 Deployment instructions using Docker Compose, including how to set up a frontend Traefik proxy to handle automatic HTTPS certificates.
+- 🌐 [Nginx](https://nginx.org) serving the frontend and proxying API routes to FastAPI.
+- 🚢 Deployment instructions using Docker Compose, with Nginx as the entrypoint (TLS handled by your platform or an external proxy).
 - 🏭 CI (continuous integration) and CD (continuous deployment) based on GitHub Actions.
 
 ### Dashboard Login
