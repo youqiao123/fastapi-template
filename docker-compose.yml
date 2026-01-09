@@ -108,7 +108,7 @@ services:
       backend:
         condition: service_started
     ports:
-      - "5080:80" # 【关键】前端映射到宿主机的 5080 端口
+      - "5022:80" # 【关键】前端映射到宿主机的 5022 端口
     build:
       context: ./frontend
       args:
