@@ -104,6 +104,9 @@ services:
   frontend:
     image: '${DOCKER_IMAGE_FRONTEND?Variable not set}:${TAG-latest}'
     restart: always
+    depends_on:
+      backend:
+        condition: service_started
     ports:
       - "5090:80" # 【关键】前端映射到宿主机的 5090 端口
     build:
