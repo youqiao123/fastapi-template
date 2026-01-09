@@ -53,8 +53,8 @@ services:
   frontend:
     restart: "no"
     ports:
-      # Keep the same host port as production so hitting cloud.drugflow.com:5905 works in watch mode too.
-      - "5905:80"
+      # Keep the same host port as production so hitting cloud.drugflow.com:5090 works in watch mode too.
+      - "5090:80"
     build:
       context: ./frontend
       args:
