@@ -86,7 +86,8 @@ export const listArtifacts = async (
     searchParams.set("limit", `${params.limit}`)
   }
 
-  const baseUrl = `${apiBase}/api/v1/artifacts`
+  // Keep trailing slash to avoid FastAPI's 307 redirect on the root list route
+  const baseUrl = `${apiBase}/api/v1/artifacts/`
   const url =
     searchParams.toString().length > 0
       ? `${baseUrl}?${searchParams.toString()}`
