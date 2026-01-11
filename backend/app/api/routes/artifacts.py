@@ -30,6 +30,8 @@ def _get_artifact(
     return artifact
 
 
+# Support both /artifacts and /artifacts/ to avoid 307 redirects on missing slash
+@router.get("", response_model=ArtifactsPublic, include_in_schema=False)
 @router.get("/", response_model=ArtifactsPublic)
 def read_artifacts(
     session: SessionDep,
