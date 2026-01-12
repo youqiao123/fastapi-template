@@ -4,11 +4,27 @@ import { Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+const StopIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    role="img"
+    aria-hidden="true"
+    focusable="false"
+    {...props}
+  >
+    <circle cx="12" cy="12" r="6.5" />
+  </svg>
+)
+
 interface ChatInputProps {
   value: string
   onChange: (value: string) => void
   onSend: (message: string) => void
+  onStop?: () => void
   disabled?: boolean
+  isStreaming?: boolean
+  isStopping?: boolean
+  canStop?: boolean
   placeholder?: string
 }
 
@@ -16,11 +32,21 @@ export default function ChatInput({
   value,
   onChange,
   onSend,
+  onStop,
   disabled = false,
+  isStreaming = false,
+  isStopping = false,
+  canStop = false,
   placeholder = "Ask a question...",
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const MAX_TEXTAREA_HEIGHT = 80
+  const isStopMode = Boolean(onStop) && isStreaming && canStop
+  const hasMessage = value.trim().length > 0
+  const isInputDisabled = disabled || isStreaming
+  const buttonDisabled = isStopMode
+    ? isStopping
+    : disabled || isStreaming || !hasMessage
 
   const resizeTextarea = React.useCallback(() => {
     const textarea = textareaRef.current
@@ -38,7 +64,7 @@ export default function ChatInput({
   }, [value, resizeTextarea])
 
   const handleSend = () => {
-    if (disabled) {
+    if (disabled || isStreaming) {
       return
     }
     const message = value.trim()
@@ -48,12 +74,19 @@ export default function ChatInput({
     onSend(message)
   }
 
+  const handleStop = () => {
+    if (!isStopMode || buttonDisabled) {
+      return
+    }
+    onStop?.()
+  }
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== "Enter" || event.shiftKey) {
+    if (event.key !== "Enter" || event.shiftKey || isStopMode) {
       return
     }
 
-    if (event.nativeEvent.isComposing || disabled) {
+    if (event.nativeEvent.isComposing || disabled || isStreaming) {
       return
     }
 
@@ -76,7 +109,7 @@ export default function ChatInput({
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        disabled={disabled}
+        disabled={isInputDisabled}
         rows={1}
         aria-label="Chat message"
         className={cn(
@@ -87,15 +120,22 @@ export default function ChatInput({
       <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
-          variant="ghost"
+          variant={isStopMode ? "destructive" : "ghost"}
           size="icon-sm"
-          onClick={handleSend}
-          disabled={disabled}
-          aria-label="Send message"
-          title="Send"
-          className="rounded-full text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+          onClick={isStopMode ? handleStop : handleSend}
+          disabled={buttonDisabled}
+          aria-label={isStopMode ? "Stop response" : "Send message"}
+          title={isStopMode ? (isStopping ? "Stopping..." : "Stop") : "Send"}
+          className={cn(
+            "rounded-full text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+            isStopMode && "text-primary-foreground",
+          )}
         >
-          <Send />
+          {isStopMode ? (
+            <StopIcon className="size-4 fill-current" />
+          ) : (
+            <Send />
+          )}
         </Button>
       </div>
     </div>

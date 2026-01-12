@@ -51,12 +51,16 @@ export function ChatPanelContainer({
   const [status, setStatus] = useState("idle")
   const [error, setError] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
+  const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [agentRuns, setAgentRuns] = useState<Record<string, AgentRunState>>({})
   const [agentTimerStart, setAgentTimerStart] = useState<number | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
   const assistantMessageIdRef = useRef<string | null>(null)
+  const activeRunIdRef = useRef<string | null>(null)
   const historyRequestRef = useRef<ReturnType<typeof listMessages> | null>(null)
   const artifactKeysRef = useRef<Set<string>>(new Set())
+  const stopRequestedRef = useRef(false)
 
   const setAssistantStatus = useCallback((nextStatus: ChatMessage["status"]) => {
     const targetId = assistantMessageIdRef.current
@@ -223,6 +227,12 @@ export function ChatPanelContainer({
     return typeof tool === "string" ? tool : null
   }
 
+  const getRunIdFromMessage = (message: SSEMessage): string | null => {
+    const payload = message.payload ?? safeParsePayload(message.data)
+    const runId = payload?.["run_id"]
+    return typeof runId === "string" ? runId : null
+  }
+
   const beginAgentRun = useCallback((messageId: string) => {
     setAgentTimerStart(null)
     setAgentRuns((prev) => ({
@@ -359,6 +369,10 @@ export function ChatPanelContainer({
       const controller = new AbortController()
       controllerRef.current = controller
       artifactKeysRef.current = new Set()
+      activeRunIdRef.current = null
+      setActiveRunId(null)
+      stopRequestedRef.current = false
+      setIsStopping(false)
 
       setIsStreaming(true)
       setStatus("connecting")
@@ -392,6 +406,7 @@ export function ChatPanelContainer({
       const url = `${apiBase}/api/v1/chat/stream?q=${encodeURIComponent(message)}&thread_id=${encodeURIComponent(activeThreadId)}`
       const token = localStorage.getItem("access_token") ?? ""
       let didError = false
+      let completionReason: "done" | "aborted" | "error" | null = null
 
       try {
         const response = await fetch(url, {
@@ -430,11 +445,34 @@ export function ChatPanelContainer({
             return
           }
 
+          if (message.event === "run_id") {
+            const runId = getRunIdFromMessage(message)
+            if (runId) {
+              activeRunIdRef.current = runId
+              setActiveRunId(runId)
+            }
+            return
+          }
+
+          if (message.event === "aborted") {
+            const runId = getRunIdFromMessage(message)
+            if (!activeRunIdRef.current || !runId || runId === activeRunIdRef.current) {
+              completionReason = "aborted"
+              stopRequestedRef.current = true
+              setStatus("aborted")
+              setAssistantStatus("aborted")
+              markAgentRunInactive(assistantMessageId)
+              controller.abort()
+            }
+            return
+          }
+
           if (message.event === "done") {
             updateElapsedForCurrentRun()
             setStatus("done")
             setAssistantStatus("done")
             markAgentRunInactive(assistantMessageId)
+            completionReason = completionReason ?? "done"
             return
           }
 
@@ -465,16 +503,34 @@ export function ChatPanelContainer({
           setStatus("error")
           setError(err instanceof Error ? err.message : "Unknown error")
           setAssistantStatus("error")
+          completionReason = "error"
         }
       } finally {
-        if (!controller.signal.aborted) {
-          updateElapsedForCurrentRun()
-          markAgentRunInactive(assistantMessageId)
-          setIsStreaming(false)
-          if (!didError) {
-            setStatus("done")
-            setAssistantStatus("done")
-          }
+        const wasAborted = controller.signal.aborted
+        const resolvedReason: "done" | "error" | "aborted" =
+          completionReason ??
+          (didError ? "error" : null) ??
+          (stopRequestedRef.current || wasAborted ? "aborted" : null) ??
+          "done"
+
+        updateElapsedForCurrentRun()
+        markAgentRunInactive(assistantMessageId)
+        setIsStreaming(false)
+        setAgentTimerStart(null)
+        setActiveRunId(null)
+        activeRunIdRef.current = null
+        setIsStopping(false)
+        stopRequestedRef.current = false
+
+        if (resolvedReason === "error") {
+          setStatus("error")
+          setAssistantStatus("error")
+        } else if (resolvedReason === "aborted") {
+          setStatus("aborted")
+          setAssistantStatus("aborted")
+        } else if (!didError) {
+          setStatus("done")
+          setAssistantStatus("done")
         }
         if (assistantMessageIdRef.current === assistantMessageId) {
           assistantMessageIdRef.current = null
@@ -488,6 +544,7 @@ export function ChatPanelContainer({
       handleToolEnd,
       handleToolStart,
       registerArtifacts,
+      getRunIdFromMessage,
       onArtifactsUpdate,
       setAssistantStatus,
       updateElapsedForCurrentRun,
@@ -521,8 +578,12 @@ export function ChatPanelContainer({
     setStatus("idle")
     setError(null)
     setIsStreaming(false)
+    setIsStopping(false)
     setAgentRuns({})
     setAgentTimerStart(null)
+    setActiveRunId(null)
+    activeRunIdRef.current = null
+    stopRequestedRef.current = false
     artifactKeysRef.current = new Set()
     onArtifactsUpdate?.([], { replace: true })
   }, [activeThreadId, onArtifactsUpdate])
@@ -562,6 +623,42 @@ export function ChatPanelContainer({
     }
   }, [activeThreadId])
 
+  const stopActiveRun = useCallback(async () => {
+    if (!isStreaming || isStopping) {
+      return
+    }
+    const runId = activeRunIdRef.current
+    if (!runId) {
+      return
+    }
+
+    stopRequestedRef.current = true
+    setIsStopping(true)
+    setStatus("stopping")
+    setAssistantStatus("aborted")
+    const assistantId = assistantMessageIdRef.current
+    if (assistantId) {
+      markAgentRunInactive(assistantId)
+    }
+    controllerRef.current?.abort()
+
+    const token = localStorage.getItem("access_token") ?? ""
+    try {
+      await fetch(`${apiBase}/agent/chat/stop`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ run_id: runId }),
+      })
+    } catch (err) {
+      console.error("Failed to stop agent run", err)
+    } finally {
+      setIsStopping(false)
+    }
+  }, [isStreaming, isStopping, markAgentRunInactive, setAssistantStatus, setStatus])
+
   const handleSend = async (message: string) => {
     if (isStreaming) {
       return
@@ -597,7 +694,10 @@ export function ChatPanelContainer({
         value={draft}
         onChange={setDraft}
         onSend={handleSend}
-        disabled={isStreaming}
+        onStop={stopActiveRun}
+        isStreaming={isStreaming}
+        isStopping={isStopping}
+        canStop={Boolean(activeRunId)}
         placeholder="Ask a question..."
       />
     </section>

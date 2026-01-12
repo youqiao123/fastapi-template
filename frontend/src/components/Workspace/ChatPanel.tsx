@@ -14,6 +14,7 @@ export type ChatMessageStatus =
   | 'streaming'
   | 'done'
   | 'error'
+  | 'aborted'
 
 export type AgentStepItem = {
   id: string
@@ -101,6 +102,7 @@ function MessageItem({
   const isSystem = message.role === "system"
   const isPending = message.status === "pending"
   const isError = message.status === "error"
+  const isAborted = message.status === "aborted"
   const showAgentSteps =
     isAssistant && agentRun && agentRun.steps.length > 0
   const artifacts = message.artifacts ?? []
@@ -211,6 +213,11 @@ function MessageItem({
         {isError ? (
           <div className="rounded-md border border-destructive/60 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">
             Generation failed.
+          </div>
+        ) : null}
+        {isAborted ? (
+          <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            Generation stopped early.
           </div>
         ) : null}
         {hasArtifactsButton ? (
