@@ -19,6 +19,15 @@ class ArtifactCreateMany(SQLModel):
     artifacts: list[ArtifactCreate]
 
 
+class ArtifactFile(SQLModel):
+    name: str
+
+
+class ArtifactFiles(SQLModel):
+    data: list[ArtifactFile]
+    count: int
+
+
 def _get_artifact(
     session: SessionDep, current_user: CurrentUser, artifact_id: uuid.UUID
 ) -> Artifact:
@@ -28,6 +37,34 @@ def _get_artifact(
             status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found"
         )
     return artifact
+
+
+def _resolve_artifact_path(
+    *, artifact: Artifact, current_user: CurrentUser, file_path: str | None = None
+) -> Path | None:
+    if not ARTIFACTS_STORAGE_DIR:
+        return None
+
+    root = Path(ARTIFACTS_STORAGE_DIR).resolve()
+    base_dir = (root / str(current_user.id)).resolve()
+    target_path = (base_dir / artifact.path).resolve()
+
+    try:
+        target_path.relative_to(base_dir)
+    except ValueError:
+        return None
+
+    if file_path:
+        subpath = Path(file_path)
+        if subpath.is_absolute() or ".." in subpath.parts:
+            return None
+        target_path = (target_path / subpath).resolve()
+        try:
+            target_path.relative_to(base_dir)
+        except ValueError:
+            return None
+
+    return target_path
 
 
 # Support both /artifacts and /artifacts/ to avoid 307 redirects on missing slash
@@ -103,19 +140,22 @@ def download_artifact(
     session: SessionDep,
     current_user: CurrentUser,
     artifact_id: uuid.UUID,
+    file_path: str | None = Query(default=None, max_length=255, alias="file_path"),
 ) -> Response:
     artifact = _get_artifact(session, current_user, artifact_id)
 
-    if ARTIFACTS_STORAGE_DIR:
-        root = Path(ARTIFACTS_STORAGE_DIR).resolve()
-        candidate = (root / str(artifact.user_id) / artifact.path).resolve()
-        try:
-            candidate.relative_to(root)
-            if candidate.is_file():
-                filename = Path(artifact.path).name or f"{artifact.id}"
-                return FileResponse(candidate, filename=filename)
-        except ValueError:
-            pass
+    candidate = _resolve_artifact_path(
+        artifact=artifact, current_user=current_user, file_path=file_path
+    )
+    if candidate and candidate.is_file():
+        filename = Path(file_path or artifact.path).name or f"{artifact.id}"
+        return FileResponse(candidate, filename=filename)
+
+    if artifact.is_folder and file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact file not found in folder",
+        )
 
     fallback_content = json.dumps(
         {
@@ -132,3 +172,42 @@ def download_artifact(
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/{artifact_id}/files", response_model=ArtifactFiles)
+def list_artifact_files(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    artifact_id: uuid.UUID,
+    prefix: str | None = Query(default=None, max_length=255),
+    suffix: str | None = Query(default=None, max_length=255),
+) -> ArtifactFiles:
+    artifact = _get_artifact(session, current_user, artifact_id)
+    if not artifact.is_folder:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Artifact is not a folder",
+        )
+
+    folder_path = _resolve_artifact_path(artifact=artifact, current_user=current_user)
+    if not folder_path or not folder_path.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Artifact folder not found",
+        )
+
+    files: list[ArtifactFile] = []
+    for entry in folder_path.iterdir():
+        if not entry.is_file():
+            continue
+        name = entry.name
+        if prefix and not name.startswith(prefix):
+            continue
+        if suffix and not name.endswith(suffix):
+            continue
+        files.append(ArtifactFile(name=name))
+
+    files.sort(key=lambda item: item.name)
+
+    return ArtifactFiles(data=files, count=len(files))

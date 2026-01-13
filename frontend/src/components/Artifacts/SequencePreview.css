@@ -1,0 +1,62 @@
+.sequence-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid hsl(var(--border) / 0.6);
+  background: hsl(var(--muted) / 0.3);
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.sequence-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.sequence-block {
+  flex: 0 0 var(--block-width, 12ch);
+  max-width: var(--block-width, 12ch);
+  box-sizing: border-box;
+}
+
+.sequence-number {
+  display: block;
+  width: 100%;
+  text-align: right;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  white-space: nowrap;
+}
+
+.sequence-line {
+  display: block;
+  width: 100%;
+  font-size: 0.95rem;
+  color: hsl(var(--foreground));
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  white-space: nowrap;
+  word-break: keep-all;
+  line-height: 1.2;
+}
+
+.sequence-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}

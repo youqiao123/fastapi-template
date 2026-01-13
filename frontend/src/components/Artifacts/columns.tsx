@@ -1,17 +1,13 @@
 import type { ColumnDef } from "@tanstack/react-table"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Download, Eye, Loader2, Trash2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Download, Eye, Trash2 } from "lucide-react"
+import { useState } from "react"
 
-import { RdkitSmilesViewer } from "@/components/ChemicalViewer/RdkitSmilesViewer"
-import { MolstarViewer } from "@/components/ProteinViewer/MolstarViewer"
+import { SmilesPreview } from "@/components/Artifacts/SmilesPreview"
+import { StructurePreview } from "@/components/Artifacts/StructurePreview"
+import { SequencePreview } from "@/components/Artifacts/SequencePreview"
 import { type ArtifactRecord } from "@/types/artifact"
-import {
-  getPreviewMode,
-  getStructureFormat,
-  parseSmilesFromCsv,
-  type PreviewMode,
-} from "@/lib/artifactPreview"
+import { getPreviewMode, type PreviewMode } from "@/lib/artifactPreview"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,10 +25,7 @@ import useCustomToast from "@/hooks/useCustomToast"
 import {
   deleteArtifact,
   downloadArtifact,
-  fetchArtifactText,
 } from "@/lib/artifacts"
-
-type PreviewStatus = "idle" | "loading" | "ready" | "error"
 
 const formatDate = (value?: string) => {
   if (!value) return ""
@@ -42,6 +35,9 @@ const formatDate = (value?: string) => {
   }
   return date.toLocaleString()
 }
+
+const PREVIEW_SUPPORT_MESSAGE =
+  "Preview is available for linker_design_output CSV, ternary_complex_structure PDB/CIF artifacts or folders, and sequence FASTA files."
 
 export const artifactColumns: ColumnDef<ArtifactRecord>[] = [
   {
@@ -155,9 +151,7 @@ function ArtifactActionsCell({ artifact }: ArtifactActionsCellProps) {
 
   const handlePreview = () => {
     if (!isPreviewable) {
-      showErrorToast(
-        "Preview is available for linker_design_output CSV and ternary_complex_structure PDB/CIF artifacts.",
-      )
+      showErrorToast(PREVIEW_SUPPORT_MESSAGE)
       return
     }
     setIsPreviewOpen(true)
@@ -173,7 +167,7 @@ function ArtifactActionsCell({ artifact }: ArtifactActionsCellProps) {
           title={
             isPreviewable
               ? "Preview"
-              : "Preview available for linker_design_output CSV or ternary_complex_structure PDB/CIF files"
+              : "Preview available for linker_design_output CSV, ternary_complex_structure PDB/CIF files and folders, and sequence FASTA files"
           }
           onClick={handlePreview}
         >
@@ -250,87 +244,8 @@ function ArtifactPreviewDialog({
   open,
   onOpenChange,
 }: ArtifactPreviewDialogProps) {
-  const [status, setStatus] = useState<PreviewStatus>("idle")
-  const [error, setError] = useState<string | null>(null)
-  const [smilesList, setSmilesList] = useState<string[]>([])
-  const [structureData, setStructureData] = useState<{
-    data: string
-    format: "pdb" | "cif"
-  } | null>(null)
-  const [activeIndex, setActiveIndex] = useState(0)
-  const loadingLabel =
-    previewMode === "structure"
-      ? "Loading structure file..."
-      : "Loading SMILES from CSV..."
-
-  useEffect(() => {
-    if (!open) return
-
-    const mode = previewMode
-
-    if (mode === "unsupported") {
-      setStatus("error")
-      setError(
-        "Preview is available for linker_design_output CSV and ternary_complex_structure PDB/CIF artifacts.",
-      )
-      return
-    }
-
-    const controller = new AbortController()
-
-    setStatus("loading")
-    setError(null)
-    setSmilesList([])
-    setStructureData(null)
-    setActiveIndex(0)
-
-    fetchArtifactText(artifact, { signal: controller.signal })
-      .then((text) => {
-        if (mode === "smiles") {
-          const smiles = parseSmilesFromCsv(text)
-          if (!smiles.length) {
-            throw new Error("No SMILES values found in the CSV file.")
-          }
-          setSmilesList(smiles)
-          setActiveIndex(0)
-        } else if (mode === "structure") {
-          if (!text.trim()) {
-            throw new Error("Structure file is empty.")
-          }
-          setStructureData({
-            data: text,
-            format: getStructureFormat(artifact.path),
-          })
-        }
-        setStatus("ready")
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load artifact preview",
-        )
-        setStatus("error")
-      })
-
-    return () => controller.abort()
-  }, [
-    artifact.id,
-    artifact.path,
-    artifact.type,
-    artifact.isFolder,
-    open,
-    previewMode,
-  ])
-
-  const hasPrev = activeIndex > 0
-  const hasNext = activeIndex < smilesList.length - 1
-  const currentSmiles = smilesList[activeIndex] ?? ""
-
-  const handlePrev = () => setActiveIndex((index) => Math.max(0, index - 1))
-  const handleNext = () =>
-    setActiveIndex((index) => Math.min(smilesList.length - 1, index + 1))
+  const isUnsupported = previewMode === "unsupported"
+  const errorMessage = PREVIEW_SUPPORT_MESSAGE
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -348,81 +263,34 @@ function ArtifactPreviewDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {status === "loading" ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              <span>{loadingLabel}</span>
-            </div>
+          {isUnsupported ? (
+            <div className="text-sm text-destructive">{errorMessage}</div>
           ) : null}
 
-          {status === "error" ? (
-            <div className="text-sm text-destructive">
-              {error ?? "Unable to load preview."}
-            </div>
+          {open && previewMode === "smiles" ? (
+            <SmilesPreview
+              key={artifact.id ?? artifact.path}
+              artifact={artifact}
+              width={520}
+              height={360}
+            />
           ) : null}
 
-          {status === "ready" && previewMode === "smiles" ? (
-            <>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>
-                  Showing SMILES {activeIndex + 1} of {smilesList.length}
-                </span>
-                <span className="text-xs font-mono rounded bg-muted px-2 py-1">
-                  SMILES column
-                </span>
-              </div>
-
-              <RdkitSmilesViewer
-                smiles={currentSmiles}
-                width={520}
-                height={360}
-                className="bg-background"
-                showSmiles
-              />
-
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">
-                  Use the controls to browse SMILES from the CSV file.
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePrev}
-                    disabled={!hasPrev}
-                  >
-                    Previous
-                  </Button>
-                  <Button size="sm" onClick={handleNext} disabled={!hasNext}>
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </>
+          {open && previewMode === "structure" ? (
+            <StructurePreview
+              key={artifact.id ?? artifact.path}
+              artifact={artifact}
+              height={520}
+            />
           ) : null}
 
-          {status === "ready" &&
-          previewMode === "structure" &&
-          structureData ? (
-            <>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>3D structure preview</span>
-                <Badge variant="secondary" className="text-xs">
-                  {structureData.format.toUpperCase()}
-                </Badge>
-              </div>
-
-              <MolstarViewer
-                data={structureData.data}
-                format={structureData.format}
-                height={520}
-                className="bg-background"
-              />
-
-              <span className="text-xs text-muted-foreground">
-                Use the Mol* controls to inspect the ternary complex structure.
-              </span>
-            </>
+          {open && previewMode === "sequence" ? (
+            <SequencePreview
+              key={artifact.id ?? artifact.path}
+              artifact={artifact}
+              groupSize={10}
+              groupsPerRow={12}
+            />
           ) : null}
         </div>
       </DialogContent>

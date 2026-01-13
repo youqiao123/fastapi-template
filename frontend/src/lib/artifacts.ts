@@ -31,6 +31,10 @@ const toDisplayArtifact = (artifact: ArtifactApiRecord): ArtifactRecord => ({
   userId: artifact.user_id,
 })
 
+type ArtifactFileRecord = {
+  name: string
+}
+
 const authHeaders = () => {
   const token = localStorage.getItem("access_token")
   return token ? { Authorization: `Bearer ${token}` } : undefined
@@ -159,10 +163,17 @@ export const downloadArtifact = async (
 
 export const fetchArtifactText = async (
   artifact: Pick<ArtifactRecord, "id" | "path">,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; filePath?: string },
 ): Promise<string> => {
+  const searchParams = new URLSearchParams()
+  if (options?.filePath) {
+    searchParams.set("file_path", options.filePath)
+  }
+
   const response = await fetch(
-    `${apiBase}/api/v1/artifacts/${artifact.id}/download`,
+    `${apiBase}/api/v1/artifacts/${artifact.id}/download${
+      searchParams.toString() ? `?${searchParams.toString()}` : ""
+    }`,
     {
       headers: {
         ...(authHeaders() ?? {}),
@@ -177,4 +188,41 @@ export const fetchArtifactText = async (
   }
 
   return response.text()
+}
+
+export const listArtifactFiles = async (
+  artifactId: string,
+  options?: {
+    prefix?: string
+    suffix?: string
+    signal?: AbortSignal
+  },
+): Promise<string[]> => {
+  const searchParams = new URLSearchParams()
+  if (options?.prefix) {
+    searchParams.set("prefix", options.prefix)
+  }
+  if (options?.suffix) {
+    searchParams.set("suffix", options.suffix)
+  }
+
+  const response = await fetch(
+    `${apiBase}/api/v1/artifacts/${artifactId}/files${
+      searchParams.toString() ? `?${searchParams.toString()}` : ""
+    }`,
+    {
+      headers: {
+        ...(authHeaders() ?? {}),
+      },
+      signal: options?.signal,
+    },
+  )
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || "Failed to load artifact files")
+  }
+
+  const data: { data: ArtifactFileRecord[] } = await response.json()
+  return data.data.map((file) => file.name)
 }
