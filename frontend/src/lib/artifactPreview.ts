@@ -86,7 +86,7 @@ export const getPreviewMode = (
   return "unsupported"
 }
 
-const splitCsvLine = (rawLine: string): string[] => {
+const splitCsvLine = (rawLine: string, delimiter = ","): string[] => {
   const line = rawLine.replace(/\r$/, "")
   const cells: string[] = []
   let current = ""
@@ -104,7 +104,7 @@ const splitCsvLine = (rawLine: string): string[] => {
       }
       continue
     }
-    if (char === "," && !inQuotes) {
+    if (char === delimiter && !inQuotes) {
       cells.push(current)
       current = ""
       continue
@@ -122,14 +122,29 @@ const normalizeCell = (cell: string) =>
   stripBom(cell).trim().replace(/^"|"$/g, "")
 
 export const parseSmilesFromCsv = (csvText: string): string[] => {
-  const lines = stripBom(csvText)
+  const rawLines = stripBom(csvText)
     .split(/\r?\n/)
     .map((line) => line.trimEnd())
     .filter((line) => line.length > 0)
 
+  if (!rawLines.length) return []
+
+  const sepMatch = rawLines[0]?.trim().match(/^sep=(.)$/i)
+  let delimiter = sepMatch?.[1] ?? ","
+  const lines = sepMatch ? rawLines.slice(1) : rawLines
+
   if (!lines.length) return []
 
-  const headers = splitCsvLine(lines[0]).map((cell) =>
+  if (!sepMatch) {
+    const candidateDelimiters = [",", ";", "\t"]
+    delimiter = candidateDelimiters.reduce((best, current) => {
+      const bestCount = splitCsvLine(lines[0], best).length
+      const currentCount = splitCsvLine(lines[0], current).length
+      return currentCount > bestCount ? current : best
+    }, delimiter)
+  }
+
+  const headers = splitCsvLine(lines[0], delimiter).map((cell) =>
     normalizeCell(cell).toLowerCase(),
   )
   const smilesIndex = headers.findIndex((header) => header === "smiles")
@@ -137,7 +152,7 @@ export const parseSmilesFromCsv = (csvText: string): string[] => {
 
   const smiles: string[] = []
   for (const rawLine of lines.slice(1)) {
-    const cells = splitCsvLine(rawLine)
+    const cells = splitCsvLine(rawLine, delimiter)
     const value = normalizeCell(cells[smilesIndex] ?? "")
     if (value) {
       smiles.push(value)

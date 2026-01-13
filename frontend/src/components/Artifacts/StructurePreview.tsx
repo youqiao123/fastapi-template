@@ -167,13 +167,14 @@ export function StructurePreview({
     structureFiles,
   ])
 
+  const isLoading = status === "loading"
   const isFolder = artifact.isFolder
   const hasPrev = activeIndex > 0
   const hasNext = activeIndex < structureFiles.length - 1
   const currentStructureFile = structureFiles[activeIndex] ?? structureFiles[0]
 
   const renderStatus = () => {
-    if (status === "loading") {
+    if (isLoading) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
@@ -230,7 +231,7 @@ export function StructurePreview({
                   variant="outline"
                   size="sm"
                   onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
-                  disabled={!hasPrev || status === "loading"}
+                  disabled={!hasPrev || isLoading}
                 >
                   Previous model
                 </Button>
@@ -241,7 +242,7 @@ export function StructurePreview({
                       Math.min(structureFiles.length - 1, index + 1),
                     )
                   }
-                  disabled={!hasNext || status === "loading"}
+                  disabled={!hasNext || isLoading}
                 >
                   Next model
                 </Button>

@@ -15,13 +15,17 @@ type PreviewStatus = "idle" | "loading" | "ready" | "error"
 type SequencePreviewProps = {
   artifact: { id?: string; path: string }
   groupSize?: number
+  groupsPerRow?: number
 }
 
 const DEFAULT_GROUP_SIZE = 10
+const DEFAULT_GROUPS_PER_ROW = 12
+const GROUP_GAP = 12
 
 export function SequencePreview({
   artifact,
   groupSize = DEFAULT_GROUP_SIZE,
+  groupsPerRow = DEFAULT_GROUPS_PER_ROW,
 }: SequencePreviewProps) {
   const [status, setStatus] = useState<PreviewStatus>("idle")
   const [error, setError] = useState<string | null>(null)
@@ -102,19 +106,27 @@ export function SequencePreview({
       const measuredWidth = measurer.getBoundingClientRect().width
       if (!measuredWidth) return
 
-      setBlockWidth(measuredWidth)
+      const containerWidth = container.getBoundingClientRect().width
+      const normalizedGroups = Math.max(groupsPerRow, 1)
+      const available =
+        containerWidth - GROUP_GAP * Math.max(normalizedGroups - 1, 0)
+      const targetWidth =
+        available > 0 ? available / normalizedGroups : measuredWidth
+
+      setBlockWidth(Math.max(measuredWidth, targetWidth))
     }
 
     updateWidth()
     const observer = new ResizeObserver(updateWidth)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [groupSize, status])
+  }, [groupSize, groupsPerRow, status])
 
   const blockWidthValue =
     blockWidth !== null ? `${blockWidth}px` : `${groupSize + 2}ch`
+  const isLoading = status === "loading"
   const renderStatus = () => {
-    if (status === "loading") {
+    if (isLoading) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
@@ -183,7 +195,7 @@ export function SequencePreview({
                   variant="outline"
                   size="sm"
                   onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
-                  disabled={!hasPrev || status === "loading"}
+                  disabled={!hasPrev || isLoading}
                 >
                   Previous sequence
                 </Button>
@@ -194,7 +206,7 @@ export function SequencePreview({
                       Math.min(sequences.length - 1, index + 1),
                     )
                   }
-                  disabled={!hasNext || status === "loading"}
+                  disabled={!hasNext || isLoading}
                 >
                   Next sequence
                 </Button>
