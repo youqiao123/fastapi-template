@@ -108,7 +108,7 @@ services:
       backend:
         condition: service_started
     ports:
-      - "5022:80" # 【关键】前端映射到宿主机的 5022 端口（容器内 Nginx 为 80）
+      - "4090:80" # 【关键】前端映射到宿主机的 4090 端口（容器内 Nginx 为 80）
     build:
       context: ./frontend
       args:
