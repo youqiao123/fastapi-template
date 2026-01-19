@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 
 import { MolstarViewer } from "@/components/ProteinViewer/MolstarViewer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   getComplexModelFiles,
   getDefaultComplexModelIndex,
@@ -27,6 +28,7 @@ export function StructurePreview({
   const [error, setError] = useState<string | null>(null)
   const [structureFiles, setStructureFiles] = useState<string[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
+  const [pageInput, setPageInput] = useState<string>("1")
   const [structureCache, setStructureCache] = useState<
     Record<string, { data: string; format: "pdb" | "cif" }>
   >({})
@@ -167,11 +169,40 @@ export function StructurePreview({
     structureFiles,
   ])
 
+  useEffect(() => {
+    if (!artifact.isFolder || !structureFiles.length) {
+      setPageInput("")
+      return
+    }
+    setPageInput(String(activeIndex + 1))
+  }, [activeIndex, artifact.isFolder, structureFiles.length])
+
   const isLoading = status === "loading"
   const isFolder = artifact.isFolder
   const hasPrev = activeIndex > 0
   const hasNext = activeIndex < structureFiles.length - 1
   const currentStructureFile = structureFiles[activeIndex] ?? structureFiles[0]
+
+  const commitPageInput = () => {
+    if (!isFolder || !structureFiles.length) return
+    const parsed = Number.parseInt(pageInput, 10)
+    if (Number.isNaN(parsed)) {
+      setPageInput(String(activeIndex + 1))
+      return
+    }
+    const clamped = Math.min(Math.max(parsed, 1), structureFiles.length)
+    setActiveIndex(clamped - 1)
+    setPageInput(String(clamped))
+  }
+
+  const handlePageInputChange = (value: string) => {
+    if (value === "") {
+      setPageInput("")
+      return
+    }
+    if (!/^\d+$/.test(value)) return
+    setPageInput(value)
+  }
 
   const renderStatus = () => {
     if (isLoading) {
@@ -210,45 +241,11 @@ export function StructurePreview({
               ) : null}
             </div>
             <div className="flex items-center gap-2">
-              {isFolder ? (
-                <Badge variant="outline" className="text-[11px]">
-                  Model {activeIndex + 1} of {structureFiles.length}
-                </Badge>
-              ) : null}
               <Badge variant="secondary" className="text-[11px]">
                 {structureData.format.toUpperCase()}
               </Badge>
             </div>
           </div>
-
-          {isFolder && structureFiles.length > 1 ? (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-mono text-[11px] text-muted-foreground break-all">
-                {currentStructureFile}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
-                  disabled={!hasPrev || isLoading}
-                >
-                  Previous model
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    setActiveIndex((index) =>
-                      Math.min(structureFiles.length - 1, index + 1),
-                    )
-                  }
-                  disabled={!hasNext || isLoading}
-                >
-                  Next model
-                </Button>
-              </div>
-            </div>
-          ) : null}
 
           <MolstarViewer
             data={structureData.data}
@@ -256,6 +253,57 @@ export function StructurePreview({
             height={height}
             className="bg-background"
           />
+
+          {isFolder && structureFiles.length > 1 ? (
+            <div className="flex items-center justify-center">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-full text-black hover:bg-black/10 dark:text-white dark:hover:bg-white/15"
+                  onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
+                  disabled={!hasPrev || isLoading}
+                  aria-label="Previous model"
+                  title="Previous model"
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <div className="flex items-center gap-1.5 text-xs text-black dark:text-white">
+                  <Input
+                    value={pageInput}
+                    onChange={(event) => handlePageInputChange(event.target.value)}
+                    onBlur={commitPageInput}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        commitPageInput()
+                      }
+                    }}
+                    className="h-8 w-12 border-black px-2 text-center text-xs text-black dark:border-white dark:text-white"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    aria-label="Current model index"
+                    disabled={isLoading}
+                  />
+                  <span>of {structureFiles.length}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-full text-black hover:bg-black/10 dark:text-white dark:hover:bg-white/15"
+                  onClick={() =>
+                    setActiveIndex((index) =>
+                      Math.min(structureFiles.length - 1, index + 1),
+                    )
+                  }
+                  disabled={!hasNext || isLoading}
+                  aria-label="Next model"
+                  title="Next model"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <span className="text-xs text-muted-foreground">
             {isFolder

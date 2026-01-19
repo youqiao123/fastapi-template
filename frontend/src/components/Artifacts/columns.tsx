@@ -26,6 +26,7 @@ import {
   deleteArtifact,
   downloadArtifact,
 } from "@/lib/artifacts"
+import { moleculeOptions } from "@/lib/smilesDrawerOptions"
 
 const formatDate = (value?: string) => {
   if (!value) return ""
@@ -38,6 +39,13 @@ const formatDate = (value?: string) => {
 
 const PREVIEW_SUPPORT_MESSAGE =
   "Preview is available for linker_design_output CSV, ternary_complex_structure PDB/CIF artifacts or folders, and sequence FASTA files."
+const SMILES_PREVIEW_SCALE = 0.8
+const SMILES_PREVIEW_WIDTH = Math.round(
+  moleculeOptions.width * SMILES_PREVIEW_SCALE,
+)
+const SMILES_PREVIEW_HEIGHT = Math.round(
+  moleculeOptions.height * SMILES_PREVIEW_SCALE,
+)
 
 export const artifactColumns: ColumnDef<ArtifactRecord>[] = [
   {
@@ -271,8 +279,8 @@ function ArtifactPreviewDialog({
             <SmilesPreview
               key={artifact.id ?? artifact.path}
               artifact={artifact}
-              width={520}
-              height={360}
+              width={SMILES_PREVIEW_WIDTH}
+              height={SMILES_PREVIEW_HEIGHT}
             />
           ) : null}
 

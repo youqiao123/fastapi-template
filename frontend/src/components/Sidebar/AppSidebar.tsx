@@ -1,12 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import {
-  Briefcase,
-  Home,
-  LayoutGrid,
-  Plus,
-  Users,
-} from "lucide-react"
+import { Briefcase, Home, LayoutGrid, Plus, Users } from "lucide-react"
 import { useState } from "react"
 
 import { CreateThreadDialog } from "@/components/Common/CreateThreadDialog"

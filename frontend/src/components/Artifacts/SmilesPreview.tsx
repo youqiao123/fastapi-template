@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 
-import { RdkitSmilesViewer } from "@/components/ChemicalViewer/RdkitSmilesViewer"
+import { SmilesDrawerViewer } from "@/components/ChemicalViewer/SmilesDrawerViewer"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { parseSmilesFromCsv } from "@/lib/artifactPreview"
 import { fetchArtifactText } from "@/lib/artifacts"
+import { moleculeOptions } from "@/lib/smilesDrawerOptions"
 
 type PreviewStatus = "idle" | "loading" | "ready" | "error"
 
@@ -16,13 +18,14 @@ type SmilesPreviewProps = {
 
 export function SmilesPreview({
   artifact,
-  width = 420,
-  height = 320,
+  width = moleculeOptions.width,
+  height = moleculeOptions.height,
 }: SmilesPreviewProps) {
   const [status, setStatus] = useState<PreviewStatus>("idle")
   const [error, setError] = useState<string | null>(null)
   const [smilesList, setSmilesList] = useState<string[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
+  const [pageInput, setPageInput] = useState<string>("1")
 
   useEffect(() => {
     setError(null)
@@ -64,9 +67,38 @@ export function SmilesPreview({
     return () => controller.abort()
   }, [artifact.id, artifact.path])
 
+  useEffect(() => {
+    if (!smilesList.length || status !== "ready") {
+      setPageInput("")
+      return
+    }
+    setPageInput(String(activeIndex + 1))
+  }, [activeIndex, smilesList.length, status])
+
   const hasPrev = activeIndex > 0
   const hasNext = activeIndex < smilesList.length - 1
   const currentSmiles = smilesList[activeIndex] ?? ""
+
+  const commitPageInput = () => {
+    if (!smilesList.length) return
+    const parsed = Number.parseInt(pageInput, 10)
+    if (Number.isNaN(parsed)) {
+      setPageInput(String(activeIndex + 1))
+      return
+    }
+    const clamped = Math.min(Math.max(parsed, 1), smilesList.length)
+    setActiveIndex(clamped - 1)
+    setPageInput(String(clamped))
+  }
+
+  const handlePageInputChange = (value: string) => {
+    if (value === "") {
+      setPageInput("")
+      return
+    }
+    if (!/^\d+$/.test(value)) return
+    setPageInput(value)
+  }
 
   const renderStatus = () => {
     if (status === "loading") {
@@ -95,46 +127,69 @@ export function SmilesPreview({
 
       {status === "ready" ? (
         <>
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
+          {/* <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>
               Showing SMILES {activeIndex + 1} of {smilesList.length}
             </span>
             <span className="text-xs font-mono rounded bg-muted px-2 py-1">
               SMILES column
             </span>
+          </div> */}
+
+          <div className="flex items-start justify-center">
+            <SmilesDrawerViewer
+              smiles={currentSmiles}
+              width={width}
+              height={height}
+              className="bg-background"
+              showSmiles
+            />
           </div>
 
-          <RdkitSmilesViewer
-            smiles={currentSmiles}
-            width={width}
-            height={height}
-            className="bg-background"
-            showSmiles
-          />
-
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">
-              Use the controls to browse SMILES from the CSV file.
-            </span>
+          <div className="flex items-center justify-center gap-3">
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full text-black hover:bg-black/10 dark:text-white dark:hover:bg-white/15"
                 onClick={() => setActiveIndex((index) => Math.max(0, index - 1))}
                 disabled={!hasPrev}
+                aria-label="Previous molecule"
+                title="Previous molecule"
               >
-                Previous
+                <ChevronLeft className="size-4" />
               </Button>
+              <div className="flex items-center gap-1.5 text-xs text-black dark:text-white">
+                <Input
+                  value={pageInput}
+                  onChange={(event) => handlePageInputChange(event.target.value)}
+                  onBlur={commitPageInput}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      commitPageInput()
+                    }
+                  }}
+                  className="h-8 w-12 border-black px-2 text-center text-xs text-black dark:border-white dark:text-white"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  aria-label="Current SMILES index"
+                />
+                <span>of {smilesList.length}</span>
+              </div>
               <Button
-                size="sm"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full text-black hover:bg-black/10 dark:text-white dark:hover:bg-white/15"
                 onClick={() =>
                   setActiveIndex((index) =>
                     Math.min(smilesList.length - 1, index + 1),
                   )
                 }
                 disabled={!hasNext}
+                aria-label="Next molecule"
+                title="Next molecule"
               >
-                Next
+                <ChevronRight className="size-4" />
               </Button>
             </div>
           </div>
