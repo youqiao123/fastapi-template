@@ -1,3 +1,4 @@
 .vscode
 node_modules/
 frontend/public/vendor/chemdoodle
+frontend/public/vendor/smiles-drawer
