@@ -7,8 +7,13 @@ import {
 } from "@/components/Workspace/ChatPanel"
 import ChatInput from "@/components/Workspace/ChatInput"
 import { apiBase } from "@/lib/api"
-import { saveArtifacts } from "@/lib/artifacts"
-import { listMessages, type MessageItem } from "@/lib/messages"
+import { saveArtifacts, toDisplayArtifact } from "@/lib/artifacts"
+import {
+  listMessages,
+  saveMessages,
+  type MessageCreate,
+  type MessageItem,
+} from "@/lib/messages"
 import { getSSEText, readSSE, type SSEMessage } from "@/lib/sse"
 import { type ArtifactDisplay, type ArtifactItem } from "@/types/artifact"
 
@@ -20,12 +25,22 @@ const normalizeRole = (role: string): ChatMessage["role"] => {
 }
 
 const mapHistoryMessages = (items: MessageItem[], threadId: string) =>
-  items.map((item, index) => ({
-    id: `${threadId}-${index}`,
-    role: normalizeRole(item.role),
-    content: item.content,
-    status: "done" as const,
-  }))
+  items.map((item, index) => {
+    const createdAt = item.created_at
+      ? Date.parse(item.created_at)
+      : undefined
+    const artifacts = Array.isArray(item.artifacts)
+      ? item.artifacts.map(toDisplayArtifact)
+      : []
+    return {
+      id: item.id ?? `${threadId}-${index}`,
+      role: normalizeRole(item.role),
+      content: item.content,
+      status: "done" as const,
+      createdAt: Number.isNaN(createdAt ?? 0) ? undefined : createdAt,
+      artifacts,
+    }
+  })
 
 type ArtifactUpdateOptions = {
   replace?: boolean
@@ -60,6 +75,8 @@ export function ChatPanelContainer({
   const activeRunIdRef = useRef<string | null>(null)
   const historyRequestRef = useRef<ReturnType<typeof listMessages> | null>(null)
   const artifactKeysRef = useRef<Set<string>>(new Set())
+  const pendingArtifactsRef = useRef<ArtifactItem[]>([])
+  const assistantContentRef = useRef("")
   const stopRequestedRef = useRef(false)
 
   const setAssistantStatus = useCallback((nextStatus: ChatMessage["status"]) => {
@@ -90,7 +107,7 @@ export function ChatPanelContainer({
     return null
   }
 
-  const toArtifactItem = (value: unknown): ArtifactItem | null => {
+  const toArtifactItem = (value: unknown, runId?: string): ArtifactItem | null => {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null
     }
@@ -99,6 +116,8 @@ export function ChatPanelContainer({
     const path = candidate["path"]
     const assetId = candidate["asset_id"]
     const isFolder = candidate["is_folder"]
+    const runIdValue =
+      typeof candidate["run_id"] === "string" ? candidate["run_id"] : runId
 
     if (
       typeof type !== "string" ||
@@ -113,6 +132,7 @@ export function ChatPanelContainer({
       path,
       assetId,
       isFolder: typeof isFolder === "boolean" ? isFolder : false,
+      runId: runIdValue,
     }
   }
 
@@ -122,10 +142,28 @@ export function ChatPanelContainer({
     if (!Array.isArray(artifactsValue)) {
       return []
     }
+    const payloadRunId =
+      typeof payload?.["run_id"] === "string" ? payload["run_id"] : undefined
+    const runId = payloadRunId ?? activeRunIdRef.current ?? undefined
     return artifactsValue
-      .map(toArtifactItem)
+      .map((artifact) => toArtifactItem(artifact, runId))
       .filter((item): item is ArtifactItem => Boolean(item))
   }
+
+  const persistMessages = useCallback(
+    async (threadId: string, messages: MessageCreate[]) => {
+      if (!messages.length) {
+        return []
+      }
+      try {
+        return await saveMessages(threadId, messages)
+      } catch (err) {
+        console.error("Failed to persist messages", err)
+        return []
+      }
+    },
+    [],
+  )
 
   const persistArtifacts = useCallback(
     async (artifacts: ArtifactItem[]) => {
@@ -212,13 +250,41 @@ export function ChatPanelContainer({
 
       onArtifactsUpdate?.(unique, { replace: false })
       attachArtifactsToMessage(options?.messageId ?? null, unique)
-      const saved = await persistArtifacts(unique)
+      const ready = unique.filter((artifact) => Boolean(artifact.runId))
+      const pending = unique.filter((artifact) => !artifact.runId)
+      if (pending.length) {
+        pendingArtifactsRef.current = [
+          ...pendingArtifactsRef.current,
+          ...pending,
+        ]
+      }
+      if (!ready.length) {
+        return
+      }
+      const saved = await persistArtifacts(ready)
       if (saved.length) {
         onArtifactsUpdate?.(saved, { replace: false })
         attachArtifactsToMessage(options?.messageId ?? null, saved)
       }
     },
     [attachArtifactsToMessage, getArtifactKey, persistArtifacts, onArtifactsUpdate],
+  )
+
+  const flushPendingArtifacts = useCallback(
+    async (runId: string) => {
+      const pending = pendingArtifactsRef.current
+      if (!pending.length) {
+        return
+      }
+      pendingArtifactsRef.current = []
+      const hydrated = pending.map((artifact) => ({ ...artifact, runId }))
+      const saved = await persistArtifacts(hydrated)
+      if (saved.length) {
+        onArtifactsUpdate?.(saved, { replace: false })
+        attachArtifactsToMessage(assistantMessageIdRef.current, saved)
+      }
+    },
+    [attachArtifactsToMessage, onArtifactsUpdate, persistArtifacts],
   )
 
   const getToolNameFromMessage = (message: SSEMessage): string | null => {
@@ -350,6 +416,7 @@ export function ChatPanelContainer({
     if (!targetId) {
       return
     }
+    assistantContentRef.current = `${assistantContentRef.current}${delta}`
     setMessages((prev) =>
       prev.map((message) =>
         message.id === targetId
@@ -369,6 +436,8 @@ export function ChatPanelContainer({
       const controller = new AbortController()
       controllerRef.current = controller
       artifactKeysRef.current = new Set()
+      pendingArtifactsRef.current = []
+      assistantContentRef.current = ""
       activeRunIdRef.current = null
       setActiveRunId(null)
       stopRequestedRef.current = false
@@ -401,6 +470,10 @@ export function ChatPanelContainer({
           status: "pending",
           createdAt: timestamp,
         },
+      ])
+
+      void persistMessages(activeThreadId, [
+        { role: "user", content: message },
       ])
 
       const url = `${apiBase}/api/v1/chat/stream?q=${encodeURIComponent(message)}&thread_id=${encodeURIComponent(activeThreadId)}`
@@ -450,6 +523,7 @@ export function ChatPanelContainer({
             if (runId) {
               activeRunIdRef.current = runId
               setActiveRunId(runId)
+              void flushPendingArtifacts(runId)
             }
             return
           }
@@ -468,6 +542,20 @@ export function ChatPanelContainer({
           }
 
           if (message.event === "done") {
+            const runId =
+              activeRunIdRef.current ?? getRunIdFromMessage(message) ?? undefined
+            if (runId) {
+              void flushPendingArtifacts(runId)
+            }
+            if (assistantContentRef.current) {
+              void persistMessages(activeThreadId, [
+                {
+                  role: "assistant",
+                  content: assistantContentRef.current,
+                  runId,
+                },
+              ])
+            }
             updateElapsedForCurrentRun()
             setStatus("done")
             setAssistantStatus("done")
@@ -543,6 +631,8 @@ export function ChatPanelContainer({
       markAgentRunInactive,
       handleToolEnd,
       handleToolStart,
+      flushPendingArtifacts,
+      persistMessages,
       registerArtifacts,
       getRunIdFromMessage,
       onArtifactsUpdate,
@@ -583,6 +673,8 @@ export function ChatPanelContainer({
     setAgentTimerStart(null)
     setActiveRunId(null)
     activeRunIdRef.current = null
+    pendingArtifactsRef.current = []
+    assistantContentRef.current = ""
     stopRequestedRef.current = false
     artifactKeysRef.current = new Set()
     onArtifactsUpdate?.([], { replace: true })

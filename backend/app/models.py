@@ -112,6 +112,7 @@ class ArtifactBase(SQLModel):
     asset_id: str = Field(max_length=255, alias="asset_id")
     is_folder: bool = Field(default=False, alias="is_folder")
     thread_id: str = Field(max_length=26)
+    run_id: str | None = Field(default=None, max_length=64, alias="run_id")
 
     model_config = SQLModel.model_config | ConfigDict(populate_by_name=True)
 
@@ -189,6 +190,39 @@ class ConversationThreadPublic(ConversationThreadBase):
 class ConversationThreadsPublic(SQLModel):
     data: list[ConversationThreadPublic]
     count: int
+
+
+class ChatMessageBase(SQLModel):
+    role: str = Field(max_length=32)
+    content: str = Field(sa_column=sa.Column(sa.Text))
+    thread_id: str = Field(max_length=26, index=True)
+    run_id: str | None = Field(default=None, max_length=64, alias="run_id", index=True)
+
+    model_config = SQLModel.model_config | ConfigDict(populate_by_name=True)
+
+
+class ChatMessageCreate(SQLModel):
+    role: str = Field(max_length=32)
+    content: str
+    run_id: str | None = Field(default=None, max_length=64, alias="run_id")
+
+    model_config = SQLModel.model_config | ConfigDict(populate_by_name=True)
+
+
+class ChatMessage(ChatMessageBase, table=True):
+    __tablename__ = "chat_message"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+
+class ChatMessagePublic(ChatMessageBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
 
 
 # Generic message

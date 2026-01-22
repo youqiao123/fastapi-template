@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  isValidElement,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { ChevronDown, PanelRightOpen } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
 import { type ArtifactDisplay } from "@/types/artifact"
+import { SmilesDrawerViewer } from "@/components/ChemicalViewer/SmilesDrawerViewer"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -106,11 +114,30 @@ function MessageItem({
   const showAgentSteps =
     isAssistant && agentRun && agentRun.steps.length > 0
   const artifacts = message.artifacts ?? []
-  const hasArtifactsButton =
+  const showArtifactsNotice =
     isAssistant &&
     message.status === "done" &&
     artifacts.length > 0 &&
     Boolean(onShowArtifacts)
+  const primaryArtifact = artifacts[0]
+  const artifactTitle =
+    artifacts.length === 1
+      ? primaryArtifact?.path ?? "Artifact ready"
+      : `${artifacts.length} artifacts ready`
+  const formatArtifactTime = (value?: string) => {
+    if (!value) return ""
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return value
+    }
+    return date.toLocaleString()
+  }
+  const artifactMeta = [
+    artifacts.length === 1 ? primaryArtifact?.type : null,
+    primaryArtifact?.createdAt ? formatArtifactTime(primaryArtifact.createdAt) : null,
+  ]
+    .filter(Boolean)
+    .join(" • ")
 
   const alignmentClass = isUser
     ? "justify-end"
@@ -194,7 +221,63 @@ function MessageItem({
                       </code>
                     )
                   },
-                  pre: (props) => <pre className="overflow-x-auto" {...props} />,
+                  pre: (props) => {
+                    if (message.status !== "done") {
+                      return <pre className="overflow-x-auto" {...props} />
+                    }
+
+                    const children = props.children
+                    const firstChild = Array.isArray(children)
+                      ? children[0]
+                      : children
+
+                    if (!isValidElement(firstChild)) {
+                      return <pre className="overflow-x-auto" {...props} />
+                    }
+
+                    const childProps = firstChild.props as {
+                      className?: unknown
+                      children?: unknown
+                    }
+                    const className = childProps.className
+                    const languageMatch =
+                      typeof className === "string"
+                        ? /language-(\S+)/.exec(className)
+                        : null
+                    const language = languageMatch?.[1]?.toLowerCase()
+
+                    if (language !== "smiles") {
+                      return <pre className="overflow-x-auto" {...props} />
+                    }
+
+                    const rawValue = childProps.children
+                    const rawText =
+                      typeof rawValue === "string"
+                        ? rawValue
+                        : Array.isArray(rawValue)
+                          ? rawValue.filter((item) => typeof item === "string").join("")
+                          : ""
+
+                    const lines = rawText
+                      .split(/\r?\n/)
+                      .map((line) => line.trim())
+                      .filter(Boolean)
+
+                    if (lines.length !== 1) {
+                      return <pre className="overflow-x-auto" {...props} />
+                    }
+
+                    return (
+                      <div className="my-2">
+                        <SmilesDrawerViewer
+                          smiles={lines[0]}
+                          width={360}
+                          height={240}
+                          showSmiles
+                        />
+                      </div>
+                    )
+                  },
                   blockquote: (props) => (
                     <blockquote
                       className="border-l-2 border-border pl-3 text-muted-foreground"
@@ -220,17 +303,35 @@ function MessageItem({
             Generation stopped early.
           </div>
         ) : null}
-        {hasArtifactsButton ? (
-          <div className="flex items-center pt-1">
+        {showArtifactsNotice ? (
+          <div className="mt-1 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100">
+            <div className="min-w-0">
+              <p
+                className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100"
+                title={artifactTitle}
+              >
+                {artifactTitle}
+              </p>
+              {artifactMeta ? (
+                <p className="text-xs text-slate-500 dark:text-slate-300">
+                  {artifactMeta}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-500 dark:text-slate-300">
+                  Open the artifacts panel to review.
+                </p>
+              )}
+            </div>
             <Button
               type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+              variant="secondary"
+              size="sm"
+              className="shrink-0 bg-blue-200 text-blue-950 hover:bg-blue-300 dark:bg-blue-300 dark:text-slate-900 dark:hover:bg-blue-400"
               aria-label="Open artifacts panel"
               title="Open artifacts panel"
               onClick={() => onShowArtifacts?.(artifacts)}
             >
+              Open
               <PanelRightOpen className="size-4" />
             </Button>
           </div>
@@ -239,6 +340,8 @@ function MessageItem({
     </div>
   )
 }
+
+const MemoMessageItem = memo(MessageItem)
 
 export function ChatPanel({
   messages,
@@ -326,7 +429,7 @@ export function ChatPanel({
           </div>
         ) : (
           messages.map((message) => (
-            <MessageItem
+            <MemoMessageItem
               key={message.id}
               message={message}
               agentRun={agentRuns?.[message.id]}

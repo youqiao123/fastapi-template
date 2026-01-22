@@ -3,6 +3,7 @@ export type ArtifactItem = {
   path: string
   isFolder: boolean
   assetId: string
+  runId?: string
 }
 
 export type ArtifactDisplay = ArtifactItem & {

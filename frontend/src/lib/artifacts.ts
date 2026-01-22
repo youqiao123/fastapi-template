@@ -9,7 +9,7 @@ type ArtifactApiResponse = {
   count: number
 }
 
-type ArtifactApiRecord = {
+export type ArtifactApiRecord = {
   id: string
   type: string
   path: string
@@ -18,9 +18,10 @@ type ArtifactApiRecord = {
   thread_id: string
   user_id?: string
   created_at: string
+  run_id?: string | null
 }
 
-const toDisplayArtifact = (artifact: ArtifactApiRecord): ArtifactRecord => ({
+export const toDisplayArtifact = (artifact: ArtifactApiRecord): ArtifactRecord => ({
   id: artifact.id,
   type: artifact.type,
   path: artifact.path,
@@ -28,6 +29,7 @@ const toDisplayArtifact = (artifact: ArtifactApiRecord): ArtifactRecord => ({
   isFolder: artifact.is_folder,
   threadId: artifact.thread_id,
   createdAt: artifact.created_at,
+  runId: artifact.run_id ?? undefined,
   userId: artifact.user_id,
 })
 
@@ -54,6 +56,7 @@ export const saveArtifacts = async (
       path: artifact.path,
       asset_id: artifact.assetId,
       is_folder: artifact.isFolder,
+      run_id: artifact.runId ?? null,
       thread_id: threadId,
     })),
   }

@@ -12,6 +12,11 @@ from starlette.responses import StreamingResponse
 from app.api.deps import CurrentUser, SessionDep, get_current_user
 from app.core.ids import generate_ulid
 from app.models import (
+    Artifact,
+    ArtifactPublic,
+    ChatMessage,
+    ChatMessageCreate,
+    ChatMessagePublic,
     ConversationThread,
     ConversationThreadCreate,
     ConversationThreadPublic,
@@ -36,9 +41,13 @@ timeout = httpx.Timeout(
     pool=10.0,
 )
 
-class MessageItem(BaseModel):
-    role: str
-    content: str
+class ChatMessageCreateMany(BaseModel):
+    thread_id: str
+    messages: list[ChatMessageCreate]
+
+
+class ChatMessageWithArtifacts(ChatMessagePublic):
+    artifacts: list[ArtifactPublic] = []
 
 
 def _get_thread(
@@ -102,24 +111,86 @@ async def chat_stream(
 
 @router.get(
     "/messages",
-    response_model=list[MessageItem],
+    response_model=list[ChatMessageWithArtifacts],
     dependencies=[Depends(get_current_user)],
 )
-async def get_messages(
+def get_messages(
     session: SessionDep,
     current_user: CurrentUser,
     thread_id: str = Query(..., min_length=1),
-) -> list[MessageItem]:
+) -> list[ChatMessageWithArtifacts]:
     _get_thread(session, current_user, thread_id)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.get(
-            f"{AGENT_BASE_URL}/agent/get_messages",
-            params={"thread_id": thread_id},
-        )
-        resp.raise_for_status()
-        data = resp.json()
 
-    return [MessageItem.model_validate(item) for item in data]
+    statement = (
+        select(ChatMessage)
+        .where(ChatMessage.thread_id == thread_id)
+        .where(ChatMessage.user_id == current_user.id)
+        .order_by(ChatMessage.created_at.asc())
+    )
+    messages = session.exec(statement).all()
+
+    run_ids = [message.run_id for message in messages if message.run_id]
+    artifacts_by_run: dict[str, list[ArtifactPublic]] = {}
+    if run_ids:
+        artifact_statement = (
+            select(Artifact)
+            .where(Artifact.user_id == current_user.id)
+            .where(Artifact.thread_id == thread_id)
+            .where(Artifact.run_id.in_(run_ids))
+        )
+        artifacts = session.exec(artifact_statement).all()
+        for artifact in artifacts:
+            if not artifact.run_id:
+                continue
+            artifacts_by_run.setdefault(artifact.run_id, []).append(artifact)
+
+    response: list[ChatMessageWithArtifacts] = []
+    for message in messages:
+        base = ChatMessagePublic.model_validate(message)
+        response.append(
+            ChatMessageWithArtifacts(
+                **base.model_dump(),
+                artifacts=artifacts_by_run.get(message.run_id or "", []),
+            )
+        )
+    return response
+
+
+@router.post(
+    "/messages",
+    response_model=list[ChatMessagePublic],
+    dependencies=[Depends(get_current_user)],
+)
+def create_messages(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    payload: ChatMessageCreateMany,
+) -> list[ChatMessagePublic]:
+    if not payload.messages:
+        return []
+
+    thread = _get_thread(session, current_user, payload.thread_id)
+    messages: list[ChatMessage] = []
+    for message_in in payload.messages:
+        message = ChatMessage.model_validate(
+            message_in,
+            update={
+                "thread_id": payload.thread_id,
+                "user_id": current_user.id,
+            },
+        )
+        messages.append(message)
+        session.add(message)
+
+    thread.updated_at = datetime.utcnow()
+    session.add(thread)
+    session.commit()
+
+    for message in messages:
+        session.refresh(message)
+
+    return [ChatMessagePublic.model_validate(message) for message in messages]
 
 
 @router.post("/threads", response_model=ConversationThreadPublic)
