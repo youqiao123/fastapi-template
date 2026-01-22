@@ -24,13 +24,38 @@ export function SmilesDrawerViewer({
 }: Props) {
   const [status, setStatus] = useState<Status>("idle")
   const [error, setError] = useState<string | null>(null)
+  const [isSmilesVisible, setIsSmilesVisible] = useState(false)
   const { resolvedTheme } = useTheme()
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const toggleButtonRef = useRef<HTMLButtonElement | null>(null)
+  const popoverRef = useRef<HTMLDivElement | null>(null)
+  const trimmedSmiles = smiles.trim()
+  const hasSmiles = Boolean(trimmedSmiles)
+
+  useEffect(() => {
+    setIsSmilesVisible(false)
+  }, [smiles])
+
+  useEffect(() => {
+    if (!isSmilesVisible) return
+    if (typeof document === "undefined") return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (popoverRef.current?.contains(target)) return
+      if (toggleButtonRef.current?.contains(target)) return
+      setIsSmilesVisible(false)
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    return () => document.removeEventListener("pointerdown", handlePointerDown)
+  }, [isSmilesVisible])
 
   useEffect(() => {
     let cancelled = false
 
-    if (!smiles.trim()) {
+    if (!trimmedSmiles) {
       setStatus("error")
       setError("Enter a valid SMILES string")
       return
@@ -77,7 +102,7 @@ export function SmilesDrawerViewer({
         }
 
         try {
-          drawer.draw(smiles.trim(), svg, resolvedTheme, onSuccess, onError)
+          drawer.draw(trimmedSmiles, svg, resolvedTheme, onSuccess, onError)
         } catch (err) {
           const message =
             err instanceof Error ? err.message : "smiles-drawer rendering failed."
@@ -98,7 +123,7 @@ export function SmilesDrawerViewer({
     return () => {
       cancelled = true
     }
-  }, [smiles, width, height, resolvedTheme])
+  }, [trimmedSmiles, width, height, resolvedTheme])
 
   return (
     <div className="mx-auto flex w-fit flex-col gap-2">
@@ -108,6 +133,45 @@ export function SmilesDrawerViewer({
           className,
         )}
       >
+        {showSmiles && hasSmiles ? (
+          <>
+            <button
+              ref={toggleButtonRef}
+              type="button"
+              className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground shadow-sm transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={isSmilesVisible ? "Hide SMILES" : "Show SMILES"}
+              aria-pressed={isSmilesVisible}
+              title={isSmilesVisible ? "Hide SMILES" : "Show SMILES"}
+              onClick={() => setIsSmilesVisible((prev) => !prev)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 4h6l3 3v13H6V7l3-3Z" />
+                <path d="M9 12h6" />
+                <path d="M9 16h4" />
+              </svg>
+            </button>
+            {isSmilesVisible ? (
+              <div
+                ref={popoverRef}
+                className="absolute right-2 top-9 z-10 max-w-[260px] rounded-md border border-border/70 bg-background/95 px-2 py-1 text-[11px] text-muted-foreground shadow-md backdrop-blur"
+              >
+                <span className="sr-only">SMILES</span>
+                <span className="break-all font-mono text-foreground">
+                  {trimmedSmiles}
+                </span>
+              </div>
+            ) : null}
+          </>
+        ) : null}
         <svg
           ref={svgRef}
           className={cn(
@@ -127,11 +191,6 @@ export function SmilesDrawerViewer({
           <span className="absolute text-xs text-destructive">{error}</span>
         ) : null}
       </div>
-      {showSmiles ? (
-        <span className="text-xs text-muted-foreground break-all">
-          SMILES: {smiles}
-        </span>
-      ) : null}
     </div>
   )
 }
