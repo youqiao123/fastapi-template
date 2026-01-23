@@ -6,7 +6,13 @@ import {
   useRef,
   useState,
 } from "react"
-import { ChevronDown, PanelRightOpen } from "lucide-react"
+import {
+  ChevronDown,
+  Copy,
+  PanelRightOpen,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -23,6 +29,8 @@ export type ChatMessageStatus =
   | 'done'
   | 'error'
   | 'aborted'
+
+export type FeedbackValue = "up" | "down"
 
 export type AgentStepItem = {
   id: string
@@ -45,6 +53,7 @@ export interface ChatMessage {
   status?: ChatMessageStatus
   createdAt?: number
   artifacts?: ArtifactDisplay[]
+  runId?: string | null
 }
 
 export interface ChatPanelProps {
@@ -53,6 +62,10 @@ export interface ChatPanelProps {
   autoScroll?: boolean
   className?: string
   onShowArtifacts?: (artifacts: ArtifactDisplay[]) => void
+  feedbackByRunId?: Record<string, FeedbackValue>
+  feedbackSubmitting?: Record<string, boolean>
+  onCopyMessage?: (message: ChatMessage) => void
+  onRateMessage?: (message: ChatMessage, value: FeedbackValue) => void
 }
 
 const AUTO_SCROLL_THRESHOLD = 80
@@ -101,10 +114,18 @@ function MessageItem({
   message,
   agentRun,
   onShowArtifacts,
+  feedbackValue,
+  isFeedbackPending,
+  onCopyMessage,
+  onRateMessage,
 }: {
   message: ChatMessage
   agentRun?: AgentRunState
   onShowArtifacts?: (artifacts: ArtifactDisplay[]) => void
+  feedbackValue?: FeedbackValue
+  isFeedbackPending?: boolean
+  onCopyMessage?: (message: ChatMessage) => void
+  onRateMessage?: (message: ChatMessage, value: FeedbackValue) => void
 }) {
   const isUser = message.role === "user"
   const isAssistant = message.role === "assistant"
@@ -123,6 +144,14 @@ function MessageItem({
     message.status === "done" &&
     artifacts.length > 0 &&
     Boolean(onShowArtifacts)
+  const runId = message.runId
+  const isFinalAssistantMessage =
+    isAssistant &&
+    (message.status === "done" ||
+      message.status === "aborted" ||
+      message.status === "error")
+  const canShowActions = isFinalAssistantMessage && Boolean(message.content?.trim())
+  const canRate = Boolean(runId)
   const primaryArtifact = artifacts[0]
   const artifactTitle =
     artifacts.length === 1
@@ -350,6 +379,52 @@ function MessageItem({
             </Button>
           </div>
         ) : null}
+        {canShowActions ? (
+          <div className="flex items-center gap-0.5 pt-1 text-muted-foreground">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-full border border-transparent bg-background/40 hover:border-border hover:bg-muted/80"
+              aria-label="copy"
+              title="copy"
+              onClick={() => onCopyMessage?.(message)}
+              disabled={!message.content}
+            >
+              <Copy className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-full border border-transparent bg-background/40 hover:border-border hover:bg-muted/80"
+              aria-label="good response"
+              title="good response"
+              onClick={() => onRateMessage?.(message, "up")}
+              disabled={!canRate || isFeedbackPending}
+            >
+              <ThumbsUp
+                className="size-4"
+                fill={feedbackValue === "up" ? "currentColor" : "none"}
+              />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-full border border-transparent bg-background/40 hover:border-border hover:bg-muted/80"
+              aria-label="bad response"
+              title="bad response"
+              onClick={() => onRateMessage?.(message, "down")}
+              disabled={!canRate || isFeedbackPending}
+            >
+              <ThumbsDown
+                className="size-4"
+                fill={feedbackValue === "down" ? "currentColor" : "none"}
+              />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -363,6 +438,10 @@ export function ChatPanel({
   autoScroll = true,
   className,
   onShowArtifacts,
+  feedbackByRunId,
+  feedbackSubmitting,
+  onCopyMessage,
+  onRateMessage,
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -435,7 +514,7 @@ export function ChatPanel({
         ref={scrollRef}
         onScroll={handleScroll}
         className={cn(
-          "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-6",
+          "flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6",
           className,
         )}
       >
@@ -450,6 +529,10 @@ export function ChatPanel({
               message={message}
               agentRun={agentRuns?.[message.id]}
               onShowArtifacts={onShowArtifacts}
+              feedbackValue={message.runId ? feedbackByRunId?.[message.runId] : undefined}
+              isFeedbackPending={message.runId ? feedbackSubmitting?.[message.runId] : false}
+              onCopyMessage={onCopyMessage}
+              onRateMessage={onRateMessage}
             />
           ))
         )}

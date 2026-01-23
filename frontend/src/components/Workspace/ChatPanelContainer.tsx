@@ -4,6 +4,7 @@ import {
   ChatPanel,
   type AgentRunState,
   type ChatMessage,
+  type FeedbackValue,
 } from "@/components/Workspace/ChatPanel"
 import ChatInput from "@/components/Workspace/ChatInput"
 import { apiBase } from "@/lib/api"
@@ -16,6 +17,7 @@ import {
 } from "@/lib/messages"
 import { getSSEText, readSSE, type SSEMessage } from "@/lib/sse"
 import { type ArtifactDisplay, type ArtifactItem } from "@/types/artifact"
+import useCustomToast from "@/hooks/useCustomToast"
 
 const normalizeRole = (role: string): ChatMessage["role"] => {
   if (role === "user" || role === "assistant" || role === "system") {
@@ -39,6 +41,7 @@ const mapHistoryMessages = (items: MessageItem[], threadId: string) =>
       status: "done" as const,
       createdAt: Number.isNaN(createdAt ?? 0) ? undefined : createdAt,
       artifacts,
+      runId: item.run_id ?? null,
     }
   })
 
@@ -70,6 +73,8 @@ export function ChatPanelContainer({
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [agentRuns, setAgentRuns] = useState<Record<string, AgentRunState>>({})
   const [agentTimerStart, setAgentTimerStart] = useState<number | null>(null)
+  const [feedbackByRunId, setFeedbackByRunId] = useState<Record<string, FeedbackValue>>({})
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState<Record<string, boolean>>({})
   const controllerRef = useRef<AbortController | null>(null)
   const assistantMessageIdRef = useRef<string | null>(null)
   const activeRunIdRef = useRef<string | null>(null)
@@ -79,6 +84,7 @@ export function ChatPanelContainer({
   const assistantContentRef = useRef("")
   const assistantAnalysisRef = useRef("")
   const stopRequestedRef = useRef(false)
+  const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const setAssistantStatus = useCallback((nextStatus: ChatMessage["status"]) => {
     const targetId = assistantMessageIdRef.current
@@ -89,6 +95,19 @@ export function ChatPanelContainer({
     setMessages((prev) =>
       prev.map((message) =>
         message.id === targetId ? { ...message, status: nextStatus } : message,
+      ),
+    )
+  }, [])
+
+  const setAssistantRunId = useCallback((runId: string) => {
+    const targetId = assistantMessageIdRef.current
+    if (!targetId) {
+      return
+    }
+
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === targetId ? { ...message, runId } : message,
       ),
     )
   }, [])
@@ -300,6 +319,84 @@ export function ChatPanelContainer({
     return typeof runId === "string" ? runId : null
   }
 
+  const handleCopyMessage = useCallback(async (message: ChatMessage) => {
+    const text = message.content ?? ""
+    if (!text.trim()) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      showSuccessToast("Copied to clipboard")
+    } catch (err) {
+      console.error("Failed to copy message", err)
+      showErrorToast("Copy failed. Please copy manually.")
+    }
+  }, [showErrorToast, showSuccessToast])
+
+  const handleRateMessage = useCallback(
+    async (message: ChatMessage, value: FeedbackValue) => {
+      if (!activeThreadId) {
+        showErrorToast("Please select a thread first.")
+        return
+      }
+      const runId = message.runId
+      if (!runId) {
+        showErrorToast("Cannot rate: missing run_id")
+        return
+      }
+      if (feedbackSubmitting[runId]) {
+        return
+      }
+
+      const isSame = feedbackByRunId[runId] === value
+
+      setFeedbackSubmitting((prev) => ({ ...prev, [runId]: true }))
+      const token = localStorage.getItem("access_token") ?? ""
+      try {
+        if (isSame) {
+          const resp = await fetch(
+            `${apiBase}/api/v1/chat/feedback?run_id=${encodeURIComponent(runId)}&thread_id=${encodeURIComponent(activeThreadId)}`,
+            {
+              method: "DELETE",
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            },
+          )
+          if (!resp.ok) {
+            throw new Error(`Failed to remove feedback: ${resp.status}`)
+          }
+          setFeedbackByRunId((prev) => {
+            const next = { ...prev }
+            delete next[runId]
+            return next
+          })
+          showSuccessToast("Feedback removed")
+        } else {
+          const resp = await fetch(`${apiBase}/api/v1/chat/feedback`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ run_id: runId, rating: value, thread_id: activeThreadId }),
+          })
+          if (!resp.ok) {
+            throw new Error(`Failed to submit feedback: ${resp.status}`)
+          }
+          setFeedbackByRunId((prev) => ({ ...prev, [runId]: value }))
+          showSuccessToast(value === "up" ? "Marked as helpful" : "Marked as not helpful")
+        }
+      } catch (err) {
+        console.error("Failed to submit feedback", err)
+        showErrorToast(isSame ? "Failed to remove feedback. Please try again." : "Failed to submit feedback. Please try again.")
+      } finally {
+        setFeedbackSubmitting((prev) => ({ ...prev, [runId]: false }))
+      }
+    },
+    [activeThreadId, feedbackByRunId, feedbackSubmitting, showErrorToast, showSuccessToast],
+  )
+
   const beginAgentRun = useCallback((messageId: string) => {
     setAgentTimerStart(null)
     setAgentRuns((prev) => ({
@@ -491,6 +588,7 @@ export function ChatPanelContainer({
           analysis: "",
           status: "pending",
           createdAt: timestamp,
+          runId: null,
         },
       ])
 
@@ -545,6 +643,7 @@ export function ChatPanelContainer({
             if (runId) {
               activeRunIdRef.current = runId
               setActiveRunId(runId)
+              setAssistantRunId(runId)
               void flushPendingArtifacts(runId)
             }
             return
@@ -555,6 +654,9 @@ export function ChatPanelContainer({
             if (!activeRunIdRef.current || !runId || runId === activeRunIdRef.current) {
               completionReason = "aborted"
               stopRequestedRef.current = true
+              if (runId) {
+                setAssistantRunId(runId)
+              }
               setStatus("aborted")
               setAssistantStatus("aborted")
               markAgentRunInactive(assistantMessageId)
@@ -567,6 +669,7 @@ export function ChatPanelContainer({
             const runId =
               activeRunIdRef.current ?? getRunIdFromMessage(message) ?? undefined
             if (runId) {
+              setAssistantRunId(runId)
               void flushPendingArtifacts(runId)
             }
             if (assistantContentRef.current) {
@@ -670,6 +773,7 @@ export function ChatPanelContainer({
       getRunIdFromMessage,
       onArtifactsUpdate,
       setAssistantStatus,
+      setAssistantRunId,
       updateElapsedForCurrentRun,
     ],
   )
@@ -705,6 +809,8 @@ export function ChatPanelContainer({
     setAgentRuns({})
     setAgentTimerStart(null)
     setActiveRunId(null)
+    setFeedbackByRunId({})
+    setFeedbackSubmitting({})
     activeRunIdRef.current = null
     pendingArtifactsRef.current = []
     assistantContentRef.current = ""
@@ -813,6 +919,10 @@ export function ChatPanelContainer({
           agentRuns={agentRuns}
           className="rounded-md border border-dashed border-border/60 bg-background/40"
           onShowArtifacts={onArtifactsView}
+          feedbackByRunId={feedbackByRunId}
+          feedbackSubmitting={feedbackSubmitting}
+          onCopyMessage={handleCopyMessage}
+          onRateMessage={handleRateMessage}
         />
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

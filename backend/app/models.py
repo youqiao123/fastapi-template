@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from enum import Enum
 from typing import Any
 
 import sqlalchemy as sa
@@ -220,6 +221,41 @@ class ChatMessage(ChatMessageBase, table=True):
 
 
 class ChatMessagePublic(ChatMessageBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+
+
+# Chat feedback
+class FeedbackRating(str, Enum):
+    up = "up"
+    down = "down"
+
+
+class ChatFeedbackBase(SQLModel):
+    thread_id: str = Field(max_length=26, index=True)
+    run_id: str = Field(max_length=64, index=True, alias="run_id")
+    rating: FeedbackRating = Field(
+        sa_column=sa.Column(sa.String(length=8), nullable=False)
+    )
+
+    model_config = SQLModel.model_config | ConfigDict(populate_by_name=True)
+
+
+class ChatFeedback(ChatFeedbackBase, table=True):
+    __tablename__ = "chat_feedback"
+    __table_args__ = (
+        sa.UniqueConstraint("run_id", "user_id", name="ux_chat_feedback_run_user"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(
+        foreign_key="user.id", nullable=False, ondelete="CASCADE", index=True
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+
+class ChatFeedbackPublic(ChatFeedbackBase):
     id: uuid.UUID
     user_id: uuid.UUID
     created_at: datetime

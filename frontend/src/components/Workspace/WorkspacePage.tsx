@@ -20,9 +20,9 @@ type WorkspacePageProps = {
 }
 
 const GUTTER_WIDTH = 16
-const DEFAULT_CHAT_WIDTH = 40 * 16
+const DEFAULT_CHAT_WIDTH = 50 * 16
 const MIN_CHAT_WIDTH = 20 * 16
-const MIN_ARTIFACT_WIDTH = 20 * 16
+const MIN_ARTIFACT_WIDTH = 32 * 16
 const COLLAPSED_ARTIFACT_WIDTH = 3 * 16
 const CLOSE_ANIMATION_MS = 200
 

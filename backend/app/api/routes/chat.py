@@ -12,16 +12,19 @@ from starlette.responses import StreamingResponse
 from app.api.deps import CurrentUser, SessionDep, get_current_user
 from app.core.ids import generate_ulid
 from app.models import (
-    Artifact,
-    ArtifactPublic,
-    ChatMessage,
-    ChatMessageCreate,
-    ChatMessagePublic,
-    ConversationThread,
-    ConversationThreadCreate,
-    ConversationThreadPublic,
-    ConversationThreadsPublic,
-    ConversationThreadUpdate,
+  Artifact,
+  ArtifactPublic,
+  ChatMessage,
+  ChatMessageCreate,
+  ChatMessagePublic,
+  ChatFeedback,
+  ChatFeedbackPublic,
+  FeedbackRating,
+  ConversationThread,
+  ConversationThreadCreate,
+  ConversationThreadPublic,
+  ConversationThreadsPublic,
+  ConversationThreadUpdate,
 )
 
 router = APIRouter(tags=["chat"])
@@ -48,6 +51,12 @@ class ChatMessageCreateMany(BaseModel):
 
 class ChatMessageWithArtifacts(ChatMessagePublic):
     artifacts: list[ArtifactPublic] = []
+
+
+class ChatFeedbackCreate(BaseModel):
+    thread_id: str
+    run_id: str
+    rating: FeedbackRating
 
 
 def _get_thread(
@@ -191,6 +200,70 @@ def create_messages(
         session.refresh(message)
 
     return [ChatMessagePublic.model_validate(message) for message in messages]
+
+
+@router.post(
+    "/chat/feedback",
+    response_model=ChatFeedbackPublic,
+    dependencies=[Depends(get_current_user)],
+)
+def create_feedback(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    payload: ChatFeedbackCreate,
+) -> ChatFeedbackPublic:
+    _get_thread(session, current_user, payload.thread_id)
+
+    existing = session.exec(
+        select(ChatFeedback).where(
+            ChatFeedback.run_id == payload.run_id,
+            ChatFeedback.user_id == current_user.id,
+        )
+    ).one_or_none()
+
+    if existing:
+        existing.rating = payload.rating
+        existing.thread_id = payload.thread_id
+        existing.created_at = datetime.utcnow()
+        session.add(existing)
+        session.commit()
+        session.refresh(existing)
+        return ChatFeedbackPublic.model_validate(existing)
+
+    feedback = ChatFeedback(
+        thread_id=payload.thread_id,
+        run_id=payload.run_id,
+        rating=payload.rating,  # type: ignore[arg-type]
+        user_id=current_user.id,
+    )
+    session.add(feedback)
+    session.commit()
+    session.refresh(feedback)
+    return ChatFeedbackPublic.model_validate(feedback)
+
+
+@router.delete(
+    "/chat/feedback",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user)],
+)
+def delete_feedback(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    thread_id: str = Query(..., min_length=1),
+    run_id: str = Query(..., min_length=1),
+):
+    _get_thread(session, current_user, thread_id)
+    feedback = session.exec(
+        select(ChatFeedback).where(
+            ChatFeedback.run_id == run_id, ChatFeedback.user_id == current_user.id
+        )
+    ).one_or_none()
+    if feedback:
+        session.delete(feedback)
+        session.commit()
 
 
 @router.post("/threads", response_model=ConversationThreadPublic)
