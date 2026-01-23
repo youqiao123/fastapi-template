@@ -137,7 +137,7 @@ const getFileName = (path: string, fallback: string) => {
 }
 
 export const downloadArtifact = async (
-  artifact: Pick<ArtifactRecord, "id" | "path">,
+  artifact: Pick<ArtifactRecord, "id" | "path" | "isFolder">,
 ): Promise<void> => {
   const response = await fetch(
     `${apiBase}/api/v1/artifacts/${artifact.id}/download`,
@@ -157,7 +157,8 @@ export const downloadArtifact = async (
   const url = window.URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url
-  link.download = getFileName(artifact.path, `artifact-${artifact.id}`)
+  const baseName = getFileName(artifact.path, `artifact-${artifact.id}`)
+  link.download = artifact.isFolder ? `${baseName}.zip` : baseName
   document.body.appendChild(link)
   link.click()
   link.remove()

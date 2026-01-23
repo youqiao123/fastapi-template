@@ -1,6 +1,6 @@
 export const moleculeOptions = {
   width: 800,
-  height: 600,
+  height: 480,
   scale: 0.8,
   bondThickness: 1.2,
   shortBondLength: 0.8,

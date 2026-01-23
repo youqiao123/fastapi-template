@@ -77,6 +77,7 @@ export function ChatPanelContainer({
   const artifactKeysRef = useRef<Set<string>>(new Set())
   const pendingArtifactsRef = useRef<ArtifactItem[]>([])
   const assistantContentRef = useRef("")
+  const assistantAnalysisRef = useRef("")
   const stopRequestedRef = useRef(false)
 
   const setAssistantStatus = useCallback((nextStatus: ChatMessage["status"]) => {
@@ -430,6 +431,25 @@ export function ChatPanelContainer({
     )
   }, [])
 
+  const appendAssistantAnalysisDelta = useCallback((delta: string) => {
+    const targetId = assistantMessageIdRef.current
+    if (!targetId) {
+      return
+    }
+    assistantAnalysisRef.current = `${assistantAnalysisRef.current}${delta}`
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === targetId
+          ? {
+              ...message,
+              analysis: `${message.analysis ?? ""}${delta}`,
+              status: "streaming",
+            }
+          : message,
+      ),
+    )
+  }, [])
+
   const startStream = useCallback(
     async (activeThreadId: string, message: string) => {
       controllerRef.current?.abort()
@@ -438,6 +458,7 @@ export function ChatPanelContainer({
       artifactKeysRef.current = new Set()
       pendingArtifactsRef.current = []
       assistantContentRef.current = ""
+      assistantAnalysisRef.current = ""
       activeRunIdRef.current = null
       setActiveRunId(null)
       stopRequestedRef.current = false
@@ -467,6 +488,7 @@ export function ChatPanelContainer({
           id: assistantMessageId,
           role: "assistant",
           content: "",
+          analysis: "",
           status: "pending",
           createdAt: timestamp,
         },
@@ -578,6 +600,16 @@ export function ChatPanelContainer({
             return
           }
 
+          if (message.event === "analysis_token") {
+            const payload = message.payload ?? safeParsePayload(message.data)
+            const token = payload?.["token"]
+            if (typeof token === "string") {
+              appendAssistantAnalysisDelta(token)
+              setStatus("streaming")
+            }
+            return
+          }
+
           const delta = getSSEText(message)
           if (!delta) {
             return
@@ -626,6 +658,7 @@ export function ChatPanelContainer({
       }
     },
     [
+      appendAssistantAnalysisDelta,
       appendAssistantDelta,
       beginAgentRun,
       markAgentRunInactive,
@@ -675,6 +708,7 @@ export function ChatPanelContainer({
     activeRunIdRef.current = null
     pendingArtifactsRef.current = []
     assistantContentRef.current = ""
+    assistantAnalysisRef.current = ""
     stopRequestedRef.current = false
     artifactKeysRef.current = new Set()
     onArtifactsUpdate?.([], { replace: true })

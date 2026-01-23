@@ -4,7 +4,10 @@ import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { SmilesDrawerViewer } from "@/components/ChemicalViewer/SmilesDrawerViewer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { parseSmilesFromCsv } from "@/lib/artifactPreview"
+import {
+  parseSmilesFromCsv,
+  type ParsedSmilesRow,
+} from "@/lib/artifactPreview"
 import { fetchArtifactText } from "@/lib/artifacts"
 import { moleculeOptions } from "@/lib/smilesDrawerOptions"
 
@@ -23,13 +26,13 @@ export function SmilesPreview({
 }: SmilesPreviewProps) {
   const [status, setStatus] = useState<PreviewStatus>("idle")
   const [error, setError] = useState<string | null>(null)
-  const [smilesList, setSmilesList] = useState<string[]>([])
+  const [rows, setRows] = useState<ParsedSmilesRow[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [pageInput, setPageInput] = useState<string>("1")
 
   useEffect(() => {
     setError(null)
-    setSmilesList([])
+    setRows([])
     setActiveIndex(0)
 
     if (!artifact.id) {
@@ -46,11 +49,11 @@ export function SmilesPreview({
       { signal: controller.signal },
     )
       .then((text) => {
-        const smiles = parseSmilesFromCsv(text)
-        if (!smiles.length) {
-          throw new Error("No SMILES values found in the CSV file.")
+        const parsed = parseSmilesFromCsv(text)
+        if (!parsed.length) {
+          throw new Error("No SMILES rows found in the CSV file.")
         }
-        setSmilesList(smiles)
+        setRows(parsed)
         setActiveIndex(0)
         setStatus("ready")
       })
@@ -68,25 +71,25 @@ export function SmilesPreview({
   }, [artifact.id, artifact.path])
 
   useEffect(() => {
-    if (!smilesList.length || status !== "ready") {
+    if (!rows.length || status !== "ready") {
       setPageInput("")
       return
     }
     setPageInput(String(activeIndex + 1))
-  }, [activeIndex, smilesList.length, status])
+  }, [activeIndex, rows.length, status])
 
   const hasPrev = activeIndex > 0
-  const hasNext = activeIndex < smilesList.length - 1
-  const currentSmiles = smilesList[activeIndex] ?? ""
+  const hasNext = activeIndex < rows.length - 1
+  const currentRow = rows[activeIndex] ?? null
 
   const commitPageInput = () => {
-    if (!smilesList.length) return
+    if (!rows.length) return
     const parsed = Number.parseInt(pageInput, 10)
     if (Number.isNaN(parsed)) {
       setPageInput(String(activeIndex + 1))
       return
     }
-    const clamped = Math.min(Math.max(parsed, 1), smilesList.length)
+    const clamped = Math.min(Math.max(parsed, 1), rows.length)
     setActiveIndex(clamped - 1)
     setPageInput(String(clamped))
   }
@@ -125,25 +128,47 @@ export function SmilesPreview({
     <div className="space-y-3">
       {renderStatus()}
 
-      {status === "ready" ? (
+      {status === "ready" && currentRow ? (
         <>
-          {/* <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
-              Showing SMILES {activeIndex + 1} of {smilesList.length}
+              Showing row {activeIndex + 1} of {rows.length}
             </span>
-            <span className="text-xs font-mono rounded bg-muted px-2 py-1">
-              SMILES column
-            </span>
-          </div> */}
+            {typeof currentRow.nll === "number" ? (
+              <span className="rounded bg-muted px-2 py-1 font-mono text-foreground">
+                NLL: {currentRow.nll.toFixed(3)}
+              </span>
+            ) : null}
+          </div>
 
-          <div className="flex items-start justify-center">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                SMILES
+              </span>
             <SmilesDrawerViewer
-              smiles={currentSmiles}
+              smiles={currentRow.smiles}
               width={width}
               height={height}
               className="bg-background"
-              showSmiles
-            />
+                showSmiles
+              />
+            </div>
+
+            {currentRow.linker ? (
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Linker
+                </span>
+                <SmilesDrawerViewer
+                  smiles={currentRow.linker}
+                  width={width}
+                  height={Math.round(height * 0.5)}
+                  className="bg-background"
+                  showSmiles
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="flex items-center justify-center gap-3">
@@ -174,15 +199,15 @@ export function SmilesPreview({
                   pattern="[0-9]*"
                   aria-label="Current SMILES index"
                 />
-                <span>of {smilesList.length}</span>
+                <span>of {rows.length}</span>
               </div>
               <Button
                 variant="ghost"
                 size="icon-sm"
                 className="rounded-full text-black hover:bg-black/10 dark:text-white dark:hover:bg-white/15"
-                onClick={() =>
-                  setActiveIndex((index) =>
-                    Math.min(smilesList.length - 1, index + 1),
+                  onClick={() =>
+                    setActiveIndex((index) =>
+                    Math.min(rows.length - 1, index + 1),
                   )
                 }
                 disabled={!hasNext}

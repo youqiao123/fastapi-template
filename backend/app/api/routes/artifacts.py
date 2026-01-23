@@ -1,10 +1,12 @@
 import json
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlmodel import SQLModel, func, select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -147,6 +149,37 @@ def download_artifact(
     candidate = _resolve_artifact_path(
         artifact=artifact, current_user=current_user, file_path=file_path
     )
+
+    if candidate and candidate.is_dir():
+        if not artifact.is_folder:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Artifact is not a folder",
+            )
+
+        def stream_zip() -> Any:
+            with tempfile.SpooledTemporaryFile(max_size=20 * 1024 * 1024) as tmp:
+                with ZipFile(tmp, mode="w", compression=ZIP_DEFLATED) as zip_file:
+                    base = candidate.name or str(artifact.id)
+                    for path in candidate.rglob("*"):
+                        if not path.is_file():
+                            continue
+                        arcname = Path(base) / path.relative_to(candidate)
+                        zip_file.write(path, arcname.as_posix())
+                tmp.seek(0)
+                while True:
+                    chunk = tmp.read(8192)
+                    if not chunk:
+                        break
+                    yield chunk
+
+        filename = f"{Path(artifact.path).name or artifact.id}.zip"
+        return StreamingResponse(
+            stream_zip(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
     if candidate and candidate.is_file():
         filename = Path(file_path or artifact.path).name or f"{artifact.id}"
         return FileResponse(candidate, filename=filename)

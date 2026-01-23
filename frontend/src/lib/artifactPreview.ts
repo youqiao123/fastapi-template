@@ -121,7 +121,13 @@ const stripBom = (value: string) => value.replace(/^\uFEFF/, "")
 const normalizeCell = (cell: string) =>
   stripBom(cell).trim().replace(/^"|"$/g, "")
 
-export const parseSmilesFromCsv = (csvText: string): string[] => {
+export type ParsedSmilesRow = {
+  smiles: string
+  linker?: string
+  nll?: number | null
+}
+
+export const parseSmilesFromCsv = (csvText: string): ParsedSmilesRow[] => {
   const rawLines = stripBom(csvText)
     .split(/\r?\n/)
     .map((line) => line.trimEnd())
@@ -150,16 +156,30 @@ export const parseSmilesFromCsv = (csvText: string): string[] => {
   const smilesIndex = headers.findIndex((header) => header === "smiles")
   if (smilesIndex === -1) return []
 
-  const smiles: string[] = []
+  const linkerIndex = headers.findIndex((header) => header === "linker")
+  const nllIndex = headers.findIndex((header) => header === "nll")
+
+  const rows: ParsedSmilesRow[] = []
   for (const rawLine of lines.slice(1)) {
     const cells = splitCsvLine(rawLine, delimiter)
-    const value = normalizeCell(cells[smilesIndex] ?? "")
-    if (value) {
-      smiles.push(value)
+    const smiles = normalizeCell(cells[smilesIndex] ?? "")
+    if (!smiles) continue
+
+    const linkerRaw =
+      linkerIndex !== -1 ? normalizeCell(cells[linkerIndex] ?? "") : undefined
+    const linker = linkerRaw ? linkerRaw : undefined
+
+    let nll: number | null = null
+    if (nllIndex !== -1) {
+      const raw = normalizeCell(cells[nllIndex] ?? "")
+      const parsed = Number.parseFloat(raw)
+      nll = Number.isFinite(parsed) ? parsed : null
     }
+
+    rows.push({ smiles, linker, nll })
   }
 
-  return smiles
+  return rows
 }
 
 export type ParsedSequence = {

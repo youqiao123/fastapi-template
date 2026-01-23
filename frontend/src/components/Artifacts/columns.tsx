@@ -142,7 +142,11 @@ function ArtifactActionsCell({ artifact }: ArtifactActionsCellProps) {
   const handleDownload = async () => {
     setIsDownloading(true)
     try {
-      await downloadArtifact({ id: artifact.id, path: artifact.path })
+      await downloadArtifact({
+        id: artifact.id,
+        path: artifact.path,
+        isFolder: artifact.isFolder,
+      })
       showSuccessToast("Download started.")
     } catch (err) {
       const message =
@@ -257,7 +261,7 @@ function ArtifactPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="top-4 left-1/2 max-h-[92vh] -translate-x-1/2 translate-y-0 overflow-y-auto sm:max-w-5xl sm:top-8 sm:left-1/2 sm:-translate-x-1/2 sm:translate-y-0 sm:max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Preview artifact</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">

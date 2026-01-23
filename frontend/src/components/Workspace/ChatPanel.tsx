@@ -41,6 +41,7 @@ export interface ChatMessage {
   id: string
   role: ChatRole
   content: string
+  analysis?: string
   status?: ChatMessageStatus
   createdAt?: number
   artifacts?: ArtifactDisplay[]
@@ -113,6 +114,9 @@ function MessageItem({
   const isAborted = message.status === "aborted"
   const showAgentSteps =
     isAssistant && agentRun && agentRun.steps.length > 0
+  const analysis =
+    typeof message.analysis === "string" ? message.analysis : ""
+  const showAnalysis = isAssistant && analysis.trim().length > 0
   const artifacts = message.artifacts ?? []
   const showArtifactsNotice =
     isAssistant &&
@@ -176,6 +180,16 @@ function MessageItem({
             steps={agentRun.steps}
             elapsedSeconds={agentRun.elapsedSeconds}
           />
+        ) : null}
+        {showAnalysis ? (
+          <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Reasoning
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
+              {analysis}
+            </p>
+          </div>
         ) : null}
         {content ? (
           isAssistant ? (
@@ -358,6 +372,7 @@ export function ChatPanel({
   const lastMessage = messages[messages.length - 1]
   const lastMessageId = lastMessage?.id
   const lastMessageContent = lastMessage?.content
+  const lastMessageAnalysis = lastMessage?.analysis
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior) => {
     const container = scrollRef.current
@@ -405,6 +420,7 @@ export function ChatPanel({
     autoScroll,
     isAutoScrollEnabled,
     lastMessageContent,
+    lastMessageAnalysis,
     lastMessageId,
     messages.length,
     scrollToBottom,

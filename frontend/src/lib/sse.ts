@@ -63,6 +63,10 @@ const parseSSEMessage = (raw: string): SSEMessage | null => {
 export const getSSEText = (message: SSEMessage): string | null => {
   const payload = message.payload ?? parseJSONPayload(message.data)
 
+  if (message.event === "analysis_token") {
+    return null
+  }
+
   if (message.event === "token") {
     return typeof payload?.token === "string" ? payload.token : null
   }
